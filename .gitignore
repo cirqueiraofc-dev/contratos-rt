@@ -1,0 +1,10 @@
+node_modules/
+
+# banco e PDFs sao dados locais — as pastas ficam versionadas vazias
+data/*
+!data/.gitkeep
+uploads/*
+!uploads/.gitkeep
+
+.env
+.DS_Store

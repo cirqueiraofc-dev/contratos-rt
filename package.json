@@ -1,0 +1,21 @@
+{
+  "name": "contratos-rt",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Gestao de contratos, ARTs/RTs e emissao de CAT (Atestado de Capacidade Tecnica)",
+  "scripts": {
+    "start": "node --no-warnings server.js",
+    "dev": "node --no-warnings --watch server.js",
+    "test": "node --no-warnings --test \"testes/*.test.mjs\""
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "multer": "^2.2.0",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^4.10.38"
+  }
+}

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Contratos e RT</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📄</text></svg>" />
+  <link rel="stylesheet" href="/css/app.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="lateral">
+      <div class="marca">
+        <span class="marca-icone">RT</span>
+        <div>
+          <strong>Contratos e RT</strong>
+          <small id="marca-empresa">Configure a empresa</small>
+        </div>
+      </div>
+
+      <nav class="menu">
+        <a href="#/painel" data-nav="painel"><span>Painel</span><b id="badge-alertas" class="badge"></b></a>
+        <a href="#/contratos" data-nav="contratos"><span>Contratos</span></a>
+        <a href="#/configuracoes" data-nav="configuracoes"><span>Configurações</span></a>
+      </nav>
+
+      <button class="botao primario largo" id="btn-novo-contrato">+ Novo contrato</button>
+
+      <div class="lateral-rodape">
+        <p>A CAT é expedida pelo CREA. O sistema gera o <strong>atestado</strong> para o contratante assinar e o <strong>requerimento</strong> para protocolar.</p>
+      </div>
+    </aside>
+
+    <main class="conteudo" id="conteudo">
+      <div class="carregando">Carregando…</div>
+    </main>
+  </div>
+
+  <div class="modal-fundo" id="modal-fundo" hidden>
+    <div class="modal" id="modal" role="dialog" aria-modal="true"></div>
+  </div>
+
+  <div class="avisos" id="avisos"></div>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
