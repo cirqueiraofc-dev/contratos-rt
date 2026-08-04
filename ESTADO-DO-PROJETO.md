@@ -284,6 +284,12 @@ foi reproduzida em texto na barra lateral, sem depender de arquivo de imagem. O 
 cores da marca. **Se um dia aparecer o arquivo vetorial** (`.ai`/`.eps`/`.svg`/`.cdr`), vale
 reamostrar as cores e trocar a marca em texto pelo SVG real.
 
+No modo escuro o acento e o vermelho viram tons claros, e o texto branco por cima deles ficava em
+2,8:1 e 2,7:1 — abaixo dos 4,5:1 que a leitura exige. Sofriam o botão primário e os contadores da
+barra lateral. A variável `--sobre-cor` guarda a cor do texto que vai sobre preenchimento sólido
+(branco no claro, o tom escuro do fundo no escuro) e leva os dois para ~6,6:1. O defeito é anterior
+à marca: o azul que havia antes tinha o mesmo problema.
+
 ### Ideias levantadas, ainda não decididas
 
 - **Importador de dados da empresa por PDF**: subir o cartão CNPJ ou o SICAF em Configurações e o
