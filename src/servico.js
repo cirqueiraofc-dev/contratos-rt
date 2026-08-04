@@ -2,7 +2,7 @@
  * Regras de negocio: situacao de cada RT e de cada contrato, pendencias,
  * alertas de vencimento e montagem dos dados que a interface consome.
  */
-import { all, get } from './db.js';
+import { agora, all, get, run } from './db.js';
 import { DISCIPLINAS } from './disciplinas.js';
 import { diasAte, formatarData, hojeISO } from './texto.js';
 
@@ -13,11 +13,54 @@ export function lerEmpresa() {
   return get('SELECT * FROM empresa WHERE id = 1');
 }
 
+export function aditivosDoContrato(contratoId) {
+  return all(
+    `SELECT id, contrato_id, numero, tipo, data_assinatura, prazo_meses, nova_data_vencimento,
+            valor_acrescido, objeto, observacoes, arquivo, arquivo_nome, criado_em
+       FROM aditivos WHERE contrato_id = ?
+      ORDER BY COALESCE(data_assinatura, '9999'), id`,
+    contratoId,
+  );
+}
+
+/**
+ * Reescreve vencimento, valor e vigencia do contrato a partir dos valores
+ * originais mais os termos aditivos registrados. Chamado sempre que um aditivo
+ * entra, sai ou muda — assim os numeros nunca ficam dessincronizados.
+ */
+export function recalcularContrato(contratoId) {
+  const contrato = get('SELECT * FROM contratos WHERE id = ?', contratoId);
+  if (!contrato) return null;
+  const aditivos = aditivosDoContrato(contratoId);
+
+  const ultimaProrrogacao = [...aditivos].reverse().find((a) => a.nova_data_vencimento);
+  const vencimento = ultimaProrrogacao?.nova_data_vencimento ?? contrato.data_vencimento_original ?? null;
+
+  const mesesAcrescidos = aditivos.reduce((soma, a) => soma + (a.prazo_meses ?? 0), 0);
+  const vigencia = contrato.vigencia_meses_original === null && !mesesAcrescidos
+    ? null
+    : (contrato.vigencia_meses_original ?? 0) + mesesAcrescidos;
+
+  const valorAcrescido = aditivos.reduce((soma, a) => soma + (a.valor_acrescido ?? 0), 0);
+  const valor = contrato.valor_original === null && !valorAcrescido
+    ? null
+    : (contrato.valor_original ?? 0) + valorAcrescido;
+
+  run(
+    'UPDATE contratos SET data_vencimento = ?, valor = ?, vigencia_meses = ?, atualizado_em = ? WHERE id = ?',
+    vencimento, valor, vigencia, agora(), contratoId,
+  );
+  return get('SELECT * FROM contratos WHERE id = ?', contratoId);
+}
+
 /**
  * Classifica uma RT considerando o prazo de alerta configurado.
+ * @param {object} rt
+ * @param {number} diasAlerta antecedencia do alerta de vencimento
+ * @param {string|null} vencimentoContrato para detectar ART que nao cobre toda a vigencia
  * @returns {object} a propria RT acrescida de campos derivados
  */
-export function enriquecerRt(rt, diasAlerta) {
+export function enriquecerRt(rt, diasAlerta, vencimentoContrato = null) {
   const dias = rt.data_validade ? diasAte(rt.data_validade) : null;
   let situacao = rt.status;
   let tom = 'neutro';
@@ -51,21 +94,32 @@ export function enriquecerRt(rt, diasAlerta) {
     }
   }
 
+  // ART emitida que termina antes do contrato deixa um periodo descoberto —
+  // tipico depois de uma prorrogacao, quando cabe ART complementar.
+  const coberturaIncompleta = Boolean(
+    rt.status !== 'dispensada'
+    && rt.numero_art
+    && rt.data_validade
+    && vencimentoContrato
+    && rt.data_validade < vencimentoContrato,
+  );
+
   return {
     ...rt,
     nome_disciplina: DISCIPLINAS[rt.disciplina]?.nome ?? rt.disciplina,
     titulo_sugerido: DISCIPLINAS[rt.disciplina]?.titulo ?? '',
     dias_para_vencer: dias,
     situacao,
-    tom,
+    tom: coberturaIncompleta && tom === 'ok' ? 'acao' : tom,
     mensagem,
+    cobertura_incompleta: coberturaIncompleta,
     tem_arquivo: Boolean(rt.arquivo),
   };
 }
 
-export function rtsDoContrato(contratoId, diasAlerta) {
+export function rtsDoContrato(contratoId, diasAlerta, vencimentoContrato = null) {
   const linhas = all('SELECT * FROM rts WHERE contrato_id = ? ORDER BY disciplina', contratoId);
-  return linhas.map((rt) => enriquecerRt(rt, diasAlerta));
+  return linhas.map((rt) => enriquecerRt(rt, diasAlerta, vencimentoContrato));
 }
 
 export function documentosDoContrato(contratoId) {
@@ -82,6 +136,7 @@ export function situacaoContrato(contrato, rts, documentos, empresa) {
   const pendentes = rts.filter((rt) => rt.situacao === 'pendente');
   const vencidas = rts.filter((rt) => rt.situacao === 'vencida');
   const aVencer = rts.filter((rt) => rt.situacao === 'a_vencer');
+  const descobertas = rts.filter((rt) => rt.cobertura_incompleta);
   const temAtestado = documentos.some((d) => d.tipo === 'atestado');
 
   // pendencias de RT so fazem sentido enquanto o contrato esta em execucao
@@ -94,6 +149,14 @@ export function situacaoContrato(contrato, rts, documentos, empresa) {
     }
     for (const rt of aVencer) {
       pendencias.push({ tipo: 'rt_a_vencer', tom: 'alerta', texto: `ART de ${rt.nome_disciplina} vence em ${rt.dias_para_vencer} dia(s)` });
+    }
+    for (const rt of descobertas) {
+      pendencias.push({
+        tipo: 'rt_cobertura',
+        tom: 'acao',
+        texto: `ART de ${rt.nome_disciplina} cobre até ${formatarData(rt.data_validade)}, `
+          + `mas o contrato vai até ${formatarData(contrato.data_vencimento)} — emitir ART complementar`,
+      });
     }
   }
 
@@ -124,7 +187,9 @@ export function situacaoContrato(contrato, rts, documentos, empresa) {
     }
     if (vencidas.length) tom = 'critico';
     else if (pendentes.length || aVencer.length) tom = tom === 'critico' ? 'critico' : 'alerta';
+    else if (descobertas.length && tom === 'ok') tom = 'acao';
     if (pendentes.length && rotulo === 'Ativo') rotulo = `Pendente de RT (${pendentes.length})`;
+    else if (descobertas.length && rotulo === 'Ativo') rotulo = `ART complementar (${descobertas.length})`;
   }
 
   return {
@@ -138,6 +203,7 @@ export function situacaoContrato(contrato, rts, documentos, empresa) {
       emitidas: rts.filter((rt) => rt.status === 'emitida' || rt.status === 'baixada').length,
       vencidas: vencidas.length,
       a_vencer: aVencer.length,
+      descobertas: descobertas.length,
       dispensadas: rts.filter((rt) => rt.status === 'dispensada').length,
     },
     tem_atestado: temAtestado,
@@ -149,11 +215,12 @@ export function montarContrato(id) {
   const contrato = get('SELECT * FROM contratos WHERE id = ?', id);
   if (!contrato) return null;
   const empresa = lerEmpresa();
-  const rts = rtsDoContrato(contrato.id, empresa.dias_alerta_rt);
+  const rts = rtsDoContrato(contrato.id, empresa.dias_alerta_rt, contrato.data_vencimento);
   const documentos = documentosDoContrato(contrato.id);
+  const aditivos = aditivosDoContrato(contrato.id);
   const situacao = situacaoContrato(contrato, rts, documentos, empresa);
   const { texto, ...semTexto } = contrato;
-  return { ...semTexto, tem_texto: Boolean(texto), rts, documentos, ...situacao };
+  return { ...semTexto, tem_texto: Boolean(texto), rts, documentos, aditivos, ...situacao };
 }
 
 /** Lista resumida para a tela de contratos. */
@@ -172,15 +239,16 @@ export function listarContratos({ status = '', busca = '' } = {}) {
   }
   const onde = filtros.length ? `WHERE ${filtros.join(' AND ')}` : '';
   const linhas = all(
-    `SELECT id, numero, contratante, objeto, valor, data_assinatura, data_vencimento,
-            vigencia_meses, status, data_conclusao, arquivo, criado_em
-       FROM contratos ${onde}
-      ORDER BY (status = 'ativo') DESC, COALESCE(data_vencimento, '9999') ASC, id DESC`,
+    `SELECT c.id, c.numero, c.contratante, c.objeto, c.valor, c.data_assinatura, c.data_vencimento,
+            c.vigencia_meses, c.status, c.data_conclusao, c.arquivo, c.criado_em,
+            (SELECT COUNT(*) FROM aditivos a WHERE a.contrato_id = c.id) AS total_aditivos
+       FROM contratos c ${onde ? onde.replace(/\b(numero|contratante|objeto|status)\b/g, 'c.$1') : ''}
+      ORDER BY (c.status = 'ativo') DESC, COALESCE(c.data_vencimento, '9999') ASC, c.id DESC`,
     ...params,
   );
 
   return linhas.map((contrato) => {
-    const rts = rtsDoContrato(contrato.id, empresa.dias_alerta_rt);
+    const rts = rtsDoContrato(contrato.id, empresa.dias_alerta_rt, contrato.data_vencimento);
     const documentos = documentosDoContrato(contrato.id);
     const situacao = situacaoContrato(contrato, rts, documentos, empresa);
     return { ...contrato, rts, ...situacao };
@@ -220,6 +288,7 @@ export function montarPainel() {
       rts_pendentes: somaRts('pendentes'),
       rts_a_vencer: somaRts('a_vencer'),
       rts_vencidas: somaRts('vencidas'),
+      rts_descobertas: somaRts('descobertas'),
       contratos_a_vencer: ativos.filter(
         (c) => c.dias_para_vencer !== null && c.dias_para_vencer >= 0 && c.dias_para_vencer <= empresa.dias_alerta_contrato,
       ).length,

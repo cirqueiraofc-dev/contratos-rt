@@ -16,7 +16,7 @@ process.env.UPLOAD_DIR = path.join(base, 'uploads');
 
 const { criarAplicacao } = await import('../src/aplicacao.js');
 const { extrairTexto } = await import('../src/extract/pdfTexto.js');
-const { datasExemplo, pdfArt, pdfContrato } = await import('./amostras.mjs');
+const { datasExemplo, pdfAditivo, pdfArt, pdfContrato } = await import('./amostras.mjs');
 
 const datas = datasExemplo();
 
@@ -162,6 +162,96 @@ test('alerta quando a ART está perto do vencimento', async () => {
   estado.contrato = contrato;
 });
 
+test('lê o PDF do termo aditivo: prorrogação, valor e nova modalidade', async () => {
+  const resultado = await json(`/api/contratos/${estado.contrato.id}/aditivos/analisar`, {
+    method: 'POST',
+    body: forma(await pdfAditivo(datas), 'aditivo-1.pdf'),
+  });
+
+  const e = resultado.extraidos;
+  assert.equal(e.ordem, 1);
+  assert.equal(e.numero, '1º Termo Aditivo');
+  assert.equal(e.contrato_referenciado, '045/2025');
+  assert.equal(e.tipo, 'prazo_valor');
+  assert.equal(e.data_assinatura, datas.assinaturaAditivo);
+  assert.equal(e.prazo_meses, 12);
+  // o termo não traz data final: o vencimento sai do vencimento atual + 12 meses
+  assert.equal(e.nova_data_vencimento, datas.vencimentoProrrogado);
+  assert.equal(e.valor_acrescido, 128450);
+  assert.equal(e.novo_valor_total, 1412950);
+  assert.match(e.objeto, /elevadores/i);
+
+  const sugeridas = e.disciplinas.filter((d) => d.sugerida).map((d) => d.disciplina);
+  assert.ok(sugeridas.includes('mecanica'), 'elevadores devem sugerir a RT de mecânica');
+
+  estado.tokenAditivo = resultado.token;
+  estado.aditivo = e;
+});
+
+test('registrar o aditivo prorroga a vigência e recalcula o valor', async () => {
+  const contrato = await json(`/api/contratos/${estado.contrato.id}/aditivos`, {
+    method: 'POST',
+    body: JSON.stringify({
+      token: estado.tokenAditivo,
+      ...estado.aditivo,
+      disciplinas: ['mecanica'],
+    }),
+  });
+
+  assert.equal(contrato.aditivos.length, 1);
+  assert.equal(contrato.data_vencimento, datas.vencimentoProrrogado);
+  assert.equal(contrato.data_vencimento_original, datas.vencimento);
+  assert.equal(contrato.valor, 1284500 + 128450);
+  assert.equal(contrato.valor_original, 1284500);
+  assert.equal(contrato.vigencia_meses, 24);
+
+  const mecanica = contrato.rts.find((rt) => rt.disciplina === 'mecanica');
+  assert.ok(mecanica, 'a modalidade nova deve entrar como RT');
+  assert.equal(mecanica.status, 'pendente');
+  assert.match(mecanica.motivo, /termo aditivo/i);
+  estado.contrato = contrato;
+});
+
+test('ART que não cobre a vigência prorrogada vira pendência de ART complementar', async () => {
+  const eletrica = estado.contrato.rts.find((rt) => rt.disciplina === 'eletrica');
+  assert.equal(eletrica.cobertura_incompleta, true);
+  assert.equal(eletrica.data_validade, datas.vencimento);
+
+  const pendencia = estado.contrato.pendencias.find((p) => p.tipo === 'rt_cobertura' && p.texto.includes('Elétrica'));
+  assert.ok(pendencia, 'deve haver pendência de cobertura para a elétrica');
+  assert.match(pendencia.texto, /ART complementar/);
+
+  const painel = await json('/api/painel');
+  assert.ok(painel.indicadores.rts_descobertas >= 1);
+});
+
+test('remover o aditivo devolve a vigência e o valor originais', async () => {
+  const contrato = await json(`/api/aditivos/${estado.contrato.aditivos[0].id}`, { method: 'DELETE' });
+
+  assert.equal(contrato.aditivos.length, 0);
+  assert.equal(contrato.data_vencimento, datas.vencimento);
+  assert.equal(contrato.valor, 1284500);
+  assert.equal(contrato.vigencia_meses, 12);
+  assert.equal(contrato.rts.find((rt) => rt.disciplina === 'eletrica').cobertura_incompleta, false);
+
+  // a RT criada pelo aditivo continua: quem removeu o termo decide o que fazer com ela
+  assert.ok(contrato.rts.some((rt) => rt.disciplina === 'mecanica'));
+  estado.contrato = contrato;
+});
+
+test('reregistra o aditivo para seguir o fluxo com o contrato prorrogado', async () => {
+  const leitura = await json(`/api/contratos/${estado.contrato.id}/aditivos/analisar`, {
+    method: 'POST',
+    body: forma(await pdfAditivo(datas), 'aditivo-1.pdf'),
+  });
+  const contrato = await json(`/api/contratos/${estado.contrato.id}/aditivos`, {
+    method: 'POST',
+    body: JSON.stringify({ token: leitura.token, ...leitura.extraidos }),
+  });
+  assert.equal(contrato.data_vencimento, datas.vencimentoProrrogado);
+  estado.contrato = contrato;
+});
+
 test('recusa gerar CAT antes de concluir o contrato', async () => {
   const resposta = await fetch(`${url}/api/contratos/${estado.contrato.id}/cat`, { method: 'POST' });
   assert.equal(resposta.status, 400);
@@ -208,6 +298,9 @@ test('o atestado gerado é um PDF legível com os dados do contrato', async () =
   assert.match(texto, /ALMEIDA/);
   assert.match(texto, /RIBEIRÃO PRETO/i);
   assert.match(texto, new RegExp(datas.assinatura.split('-').reverse().join('/')));
+  // o atestado precisa listar os termos aditivos — o CREA exige contrato e aditivos
+  assert.match(texto, /TERMOS ADITIVOS/i);
+  assert.match(texto, /1º Termo Aditivo/);
 });
 
 test('o requerimento de CAT traz os dados do profissional e da ART', async () => {

@@ -5,6 +5,10 @@ const ROTULO_RT = {
   pendente: 'Pendente de RT', emitida: 'ART emitida', baixada: 'ART baixada', dispensada: 'Dispensada',
   vencida: 'ART vencida', a_vencer: 'ART a vencer',
 };
+const ROTULO_TIPO_ADITIVO = {
+  prazo: 'Prorrogação de prazo', valor: 'Alteração de valor',
+  prazo_valor: 'Prazo e valor', escopo: 'Alteração de escopo',
+};
 
 function etiqueta(texto, tom = 'neutro') {
   return `<span class="etiqueta ${tom}">${escapar(texto)}</span>`;
@@ -66,6 +70,7 @@ export function telaPainel(dados) {
       ${indicador(i.rts_pendentes, 'RTs pendentes', i.rts_pendentes ? 'alerta' : '', '#/contratos?status=ativo')}
       ${indicador(i.rts_a_vencer, 'ARTs a vencer', i.rts_a_vencer ? 'alerta' : '')}
       ${indicador(i.rts_vencidas, 'ARTs vencidas', i.rts_vencidas ? 'critico' : '')}
+      ${indicador(i.rts_descobertas ?? 0, 'ARTs complementares', i.rts_descobertas ? 'acao' : '')}
       ${indicador(i.contratos_a_vencer, 'Contratos a vencer', i.contratos_a_vencer ? 'alerta' : '')}
       ${indicador(i.cats_a_gerar, 'CATs a gerar', i.cats_a_gerar ? 'acao' : '', '#/contratos?status=concluido')}
     </div>
@@ -101,6 +106,7 @@ export function telaContratos(contratos, filtros) {
       <div class="direita">
         ${etiqueta(c.rotulo, c.tom)}
         <span class="sub">${formatarData(c.data_assinatura)} → ${formatarData(c.data_vencimento)}</span>
+        ${c.total_aditivos ? etiqueta(`${c.total_aditivos} aditivo(s)`, 'acento') : ''}
       </div>
       <div class="objeto">${escapar(c.objeto || 'Sem descrição de objeto.')}</div>
       <div class="chips" style="grid-column:1/-1">${chipsRt(c)}</div>
@@ -152,6 +158,9 @@ function cartaoRt(rt, contrato) {
       </div>
       ${dados}
       <div class="rt-dados"><span>${escapar(rt.mensagem)}</span></div>
+      ${rt.cobertura_incompleta
+        ? `<div class="rt-dados"><span class="etiqueta acao">Não cobre até o fim do contrato — emitir ART complementar</span></div>`
+        : ''}
       <div class="rt-acoes">
         ${podeEditar && rt.status === 'pendente'
           ? `<button class="botao pequeno primario" data-acao="subir-art" data-rt="${rt.id}">Importar ART (PDF)</button>`
@@ -168,6 +177,7 @@ function cartaoRt(rt, contrato) {
 
 export function telaContrato(contrato, disciplinas) {
   const faltantes = disciplinas.filter((d) => !contrato.rts.some((rt) => rt.disciplina === d.id));
+  const temAditivos = Boolean(contrato.aditivos?.length);
 
   const pendencias = contrato.pendencias.length
     ? `<div class="cartao">
@@ -177,6 +187,28 @@ export function telaContrato(contrato, disciplinas) {
          `).join('')}</div>
        </div>`
     : '';
+
+  const aditivos = contrato.aditivos?.length
+    ? `<table class="tabela">
+         <thead><tr><th>Termo</th><th>Assinatura</th><th>Alteração</th><th>Efeito</th><th></th></tr></thead>
+         <tbody>${contrato.aditivos.map((a) => `
+           <tr>
+             <td><strong>${escapar(a.numero)}</strong></td>
+             <td>${formatarData(a.data_assinatura)}</td>
+             <td>${escapar(ROTULO_TIPO_ADITIVO[a.tipo] ?? a.tipo)}</td>
+             <td>${[
+               a.nova_data_vencimento ? `vigência até ${formatarData(a.nova_data_vencimento)}` : '',
+               a.valor_acrescido
+                 ? `${a.valor_acrescido > 0 ? 'acréscimo' : 'supressão'} de ${formatarMoeda(Math.abs(a.valor_acrescido))}`
+                 : '',
+             ].filter(Boolean).map(escapar).join('<br>') || '—'}</td>
+             <td style="text-align:right;white-space:nowrap">
+               ${a.arquivo ? `<a class="botao pequeno" href="/api/aditivos/${a.id}/arquivo" target="_blank" rel="noopener">PDF</a>` : ''}
+               <button class="botao pequeno perigo" data-acao="remover-aditivo" data-aditivo="${a.id}">Remover</button>
+             </td>
+           </tr>`).join('')}</tbody>
+       </table>`
+    : '<div class="vazio">Nenhum termo aditivo registrado. Ao prorrogar ou aditivar o contrato, registre o termo aqui para o vencimento e o valor serem atualizados.</div>';
 
   const documentos = contrato.documentos.length
     ? `<table class="tabela">
@@ -222,9 +254,15 @@ export function telaContrato(contrato, disciplinas) {
         <tbody>
           <tr><td style="width:32%"><strong>Contratante</strong></td><td>${escapar(contrato.contratante || '—')}${contrato.contratante_cnpj ? ` · CNPJ ${escapar(contrato.contratante_cnpj)}` : ''}</td></tr>
           <tr><td><strong>Assinatura</strong></td><td>${formatarData(contrato.data_assinatura)}</td></tr>
-          <tr><td><strong>Vencimento</strong></td><td>${formatarData(contrato.data_vencimento)}${contrato.vigencia_meses ? ` · vigência de ${contrato.vigencia_meses} meses` : ''}</td></tr>
+          <tr><td><strong>Vencimento</strong></td><td>${formatarData(contrato.data_vencimento)}${contrato.vigencia_meses ? ` · vigência de ${contrato.vigencia_meses} meses` : ''}${
+            temAditivos && contrato.data_vencimento_original !== contrato.data_vencimento
+              ? ` <span class="etiqueta acao">prorrogado · original ${formatarData(contrato.data_vencimento_original)}</span>` : ''
+          }</td></tr>
           ${contrato.data_conclusao ? `<tr><td><strong>Conclusão</strong></td><td>${formatarData(contrato.data_conclusao)}</td></tr>` : ''}
-          <tr><td><strong>Valor</strong></td><td>${formatarMoeda(contrato.valor)}</td></tr>
+          <tr><td><strong>Valor</strong></td><td>${formatarMoeda(contrato.valor)}${
+            temAditivos && contrato.valor_original !== contrato.valor
+              ? ` <span class="etiqueta acao">aditivado · original ${formatarMoeda(contrato.valor_original)}</span>` : ''
+          }</td></tr>
           <tr><td><strong>Objeto</strong></td><td>${escapar(contrato.objeto || '—')}</td></tr>
           ${contrato.observacoes ? `<tr><td><strong>Observações</strong></td><td>${escapar(contrato.observacoes)}</td></tr>` : ''}
         </tbody>
@@ -246,6 +284,17 @@ export function telaContrato(contrato, disciplinas) {
       ${contrato.rts.length
         ? `<div class="grade-rts">${contrato.rts.map((rt) => cartaoRt(rt, contrato)).join('')}</div>`
         : '<div class="vazio">Nenhuma modalidade de RT cadastrada para este contrato.</div>'}
+    </div>
+
+    <div class="cartao">
+      <div class="cartao-titulo">
+        <h2>Termos aditivos</h2>
+        <span class="direita">
+          ${contrato.status === 'cancelado' ? ''
+            : '<button class="botao pequeno primario" data-acao="novo-aditivo">+ Registrar aditivo (PDF)</button>'}
+        </span>
+      </div>
+      ${aditivos}
     </div>
 
     <div class="cartao">

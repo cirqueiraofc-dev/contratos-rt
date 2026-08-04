@@ -47,6 +47,10 @@ export const api = {
   descartarRascunho: (token) => json('POST')('/contratos/descartar', { token }),
   eventos: (id) => pedir(`/contratos/${id}/eventos`),
 
+  analisarAditivo: (contratoId, arquivo) => enviarArquivo(`/contratos/${contratoId}/aditivos/analisar`, arquivo),
+  salvarAditivo: (contratoId, dados) => json('POST')(`/contratos/${contratoId}/aditivos`, dados),
+  removerAditivo: (id) => pedir(`/aditivos/${id}`, { method: 'DELETE' }),
+
   adicionarRt: (contratoId, disciplina) => json('POST')(`/contratos/${contratoId}/rts`, { disciplina }),
   atualizarRt: (id, dados) => json('PUT')(`/rts/${id}`, dados),
   removerRt: (id) => pedir(`/rts/${id}`, { method: 'DELETE' }),

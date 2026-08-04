@@ -228,6 +228,156 @@ export function fluxoEditarContrato(contrato, aoConcluir) {
   });
 }
 
+/* -------------------------------------------------------- termo aditivo */
+
+export function fluxoRegistrarAditivo(contrato, aoConcluir) {
+  const modal = abrirModal({
+    titulo: `Registrar termo aditivo — Contrato ${contrato.numero}`,
+    corpo: `
+      <p style="color:var(--texto-fraco);font-size:13.5px">
+        Envie o PDF do termo aditivo. O sistema lê a prorrogação de prazo, o acréscimo ou supressão
+        de valor e atualiza a vigência e o valor do contrato.
+      </p>
+      ${HTML_ZONA}
+      <p style="margin-top:14px;font-size:12.5px;color:var(--texto-fraco)">
+        Sem o PDF? <button class="botao pequeno" data-manual>Preencher manualmente</button>
+      </p>`,
+  });
+
+  $('[data-manual]', modal).addEventListener('click', () => {
+    formularioAditivo(contrato, { token: null, extraidos: { avisos: [], disciplinas: [] } }, aoConcluir);
+  });
+
+  zonaUpload(modal, 'Selecionar PDF do termo aditivo', async (arquivo) => {
+    $('.modal-corpo', modal).innerHTML = '<div class="vazio">Lendo o termo aditivo…</div>';
+    try {
+      const resultado = await api.analisarAditivo(contrato.id, arquivo);
+      formularioAditivo(contrato, resultado, aoConcluir);
+    } catch (erro) {
+      aviso(erro.message, 'erro');
+      fluxoRegistrarAditivo(contrato, aoConcluir);
+    }
+  });
+}
+
+function formularioAditivo(contrato, { token, extraidos }, aoConcluir) {
+  const e = extraidos ?? {};
+  const procedencia = [
+    e.procedencia?.data_assinatura ? `Data de assinatura: ${e.procedencia.data_assinatura}.` : '',
+    e.procedencia?.vencimento ? `Novo vencimento: ${e.procedencia.vencimento}.` : '',
+    e.procedencia?.valor ? `Valor: ${e.procedencia.valor}.` : '',
+  ].filter(Boolean).join(' ');
+
+  // so oferece as modalidades que o contrato ainda nao tem
+  const novas = (e.disciplinas ?? []).filter(
+    (d) => d.sugerida && !contrato.rts.some((rt) => rt.disciplina === d.disciplina),
+  );
+
+  const modal = abrirModal({
+    titulo: token ? 'Conferir dados do termo aditivo' : 'Registrar termo aditivo',
+    largura: 800,
+    corpo: `
+      ${caixaAvisos(e.avisos)}
+      ${procedencia ? `<div class="aviso-caixa info">${escapar(procedencia)}</div>` : ''}
+      <div class="aviso-caixa info">
+        Vigência atual do contrato: <strong>${formatarData(contrato.data_vencimento)}</strong> ·
+        valor atual: <strong>${contrato.valor != null ? Number(contrato.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}</strong>
+      </div>
+      <form id="form-aditivo">
+        <div class="grade-campos">
+          ${campo({ nome: 'numero', rotulo: 'Identificação do termo *', valor: e.numero ?? '', dica: 'Ex.: 1º Termo Aditivo' })}
+          ${campo({
+            nome: 'tipo',
+            rotulo: 'Tipo',
+            tipo: 'select',
+            valor: e.tipo ?? 'prazo',
+            opcoes: [
+              { valor: 'prazo', texto: 'Prorrogação de prazo' },
+              { valor: 'valor', texto: 'Alteração de valor' },
+              { valor: 'prazo_valor', texto: 'Prazo e valor' },
+              { valor: 'escopo', texto: 'Alteração de escopo' },
+            ],
+          })}
+          ${campo({ nome: 'data_assinatura', rotulo: 'Data de assinatura do termo', tipo: 'date', valor: e.data_assinatura ?? '' })}
+          ${campo({ nome: 'prazo_meses', rotulo: 'Prazo acrescido (meses)', tipo: 'number', valor: e.prazo_meses ?? '', atributos: 'min="0"' })}
+          ${campo({
+            nome: 'nova_data_vencimento',
+            rotulo: 'Nova data de vencimento',
+            tipo: 'date',
+            valor: e.nova_data_vencimento ?? '',
+            dica: 'Passa a valer como vencimento do contrato',
+          })}
+          ${campo({
+            nome: 'valor_acrescido',
+            rotulo: 'Valor acrescido (R$)',
+            tipo: 'number',
+            valor: e.valor_acrescido ?? '',
+            atributos: 'step="0.01"',
+            dica: 'Use número negativo para supressão',
+          })}
+          ${campo({ nome: 'objeto', rotulo: 'Objeto do aditivo', tipo: 'textarea', valor: e.objeto ?? '', largo: true })}
+        </div>
+
+        ${novas.length ? `
+          <h3 style="font-size:14px;margin:12px 0 8px">Novas modalidades de RT no escopo</h3>
+          <p style="font-size:12.5px;color:var(--texto-fraco);margin-bottom:10px">
+            O aditivo parece trazer serviço que o contrato ainda não tinha. As marcadas entram como
+            <strong>pendente de RT</strong>.
+          </p>
+          ${novas.map(blocoDeteccao).join('')}` : ''}
+      </form>`,
+    rodape: `<button class="botao" data-cancelar>Cancelar</button>
+             <button class="botao primario" data-salvar>Registrar aditivo</button>`,
+  });
+
+  const forma = $('#form-aditivo', modal);
+
+  // prazo em meses preenchido: calcula o novo vencimento a partir do vencimento atual
+  forma.querySelector('[name=prazo_meses]').addEventListener('change', async (ev) => {
+    const meses = Number(ev.target.value);
+    const campoData = forma.querySelector('[name=nova_data_vencimento]');
+    if (!meses || !contrato.data_vencimento || campoData.value) return;
+    const diaSeguinte = new Date(`${contrato.data_vencimento}T12:00:00Z`);
+    diaSeguinte.setUTCDate(diaSeguinte.getUTCDate() + 1);
+    try {
+      const { data_vencimento } = await api.calcularVencimento({
+        data_assinatura: diaSeguinte.toISOString().slice(0, 10),
+        vigencia_meses: meses,
+      });
+      if (data_vencimento) campoData.value = data_vencimento;
+    } catch { /* calculo auxiliar: falha nao bloqueia o registro */ }
+  });
+
+  for (const caixa of $$('[data-deteccao] input', modal)) {
+    caixa.addEventListener('change', () => {
+      caixa.closest('[data-deteccao]').classList.toggle('marcada', caixa.checked);
+    });
+  }
+
+  $('[data-cancelar]', modal).addEventListener('click', () => {
+    if (token) api.descartarRascunho(token).catch(() => {});
+    fecharModal();
+  });
+
+  $('[data-salvar]', modal).addEventListener('click', async (ev) => {
+    const dados = lerCampos(forma);
+    if (!dados.numero) {
+      aviso('Informe a identificação do termo aditivo.', 'erro');
+      return;
+    }
+    ocupado(ev.target, true, 'Salvando…');
+    try {
+      const atualizado = await api.salvarAditivo(contrato.id, { ...dados, token });
+      fecharModal();
+      aviso(`${dados.numero} registrado. Vigência e valor do contrato atualizados.`, 'sucesso');
+      aoConcluir(atualizado);
+    } catch (erro) {
+      aviso(erro.message, 'erro');
+      ocupado(ev.target, false);
+    }
+  });
+}
+
 /* ---------------------------------------------------------- importar ART */
 
 export function fluxoImportarArt(rt, aoConcluir) {

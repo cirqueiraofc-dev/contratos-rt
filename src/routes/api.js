@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import { agora, all, get, registrarEvento, run } from '../db.js';
 import { DISCIPLINAS, IDS_DISCIPLINAS } from '../disciplinas.js';
 import { analisarContrato } from '../extract/contrato.js';
+import { analisarAditivo } from '../extract/aditivo.js';
 import { analisarArt } from '../extract/art.js';
 import { extrairTexto } from '../extract/pdfTexto.js';
 import { gerarAtestado } from '../docs/atestado.js';
@@ -14,8 +15,9 @@ import {
 } from '../arquivos.js';
 import {
   STATUS_CONTRATO, STATUS_RT, lerEmpresa, listarContratos, montarContrato, montarPainel,
+  recalcularContrato,
 } from '../servico.js';
-import { hojeISO, somarMeses } from '../texto.js';
+import { formatarData, formatarMoeda, hojeISO, somarMeses } from '../texto.js';
 
 export const api = express.Router();
 
@@ -160,15 +162,19 @@ api.post('/contratos', rota((req, res) => {
   }
 
   const agoraIso = agora();
+  const valor = numeroOuNulo(c.valor);
+  const vencimento = dataOuNulo(c.data_vencimento);
+  const vigencia = numeroOuNulo(c.vigencia_meses);
   const { id } = run(
     `INSERT INTO contratos (numero, contratante, contratante_cnpj, objeto, valor, data_assinatura,
                             data_vencimento, vigencia_meses, status, observacoes, arquivo, arquivo_nome,
-                            texto, criado_em, atualizado_em)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ativo', ?, ?, ?, ?, ?, ?)`,
+                            texto, valor_original, data_vencimento_original, vigencia_meses_original,
+                            criado_em, atualizado_em)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ativo', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     textoOuVazio(c.numero), textoOuVazio(c.contratante), textoOuVazio(c.contratante_cnpj),
-    textoOuVazio(c.objeto), numeroOuNulo(c.valor), dataOuNulo(c.data_assinatura),
-    dataOuNulo(c.data_vencimento), numeroOuNulo(c.vigencia_meses), textoOuVazio(c.observacoes),
-    arquivo, arquivoNome, texto, agoraIso, agoraIso,
+    textoOuVazio(c.objeto), valor, dataOuNulo(c.data_assinatura),
+    vencimento, vigencia, textoOuVazio(c.observacoes),
+    arquivo, arquivoNome, texto, valor, vencimento, vigencia, agoraIso, agoraIso,
   );
 
   for (const disciplina of disciplinas) {
@@ -213,15 +219,20 @@ api.put('/contratos/:id', rota((req, res) => {
   const c = req.body ?? {};
   exigir(textoOuVazio(c.numero ?? atual.numero), 'Informe o número do contrato.');
 
+  // a edicao altera o contrato original; vencimento, valor e vigencia atuais
+  // sao recalculados na sequencia somando os termos aditivos existentes
   run(
-    `UPDATE contratos SET numero = ?, contratante = ?, contratante_cnpj = ?, objeto = ?, valor = ?,
-            data_assinatura = ?, data_vencimento = ?, vigencia_meses = ?, observacoes = ?, atualizado_em = ?
+    `UPDATE contratos SET numero = ?, contratante = ?, contratante_cnpj = ?, objeto = ?,
+            data_assinatura = ?, observacoes = ?,
+            valor_original = ?, data_vencimento_original = ?, vigencia_meses_original = ?,
+            atualizado_em = ?
       WHERE id = ?`,
     textoOuVazio(c.numero ?? atual.numero), textoOuVazio(c.contratante), textoOuVazio(c.contratante_cnpj),
-    textoOuVazio(c.objeto), numeroOuNulo(c.valor), dataOuNulo(c.data_assinatura),
-    dataOuNulo(c.data_vencimento), numeroOuNulo(c.vigencia_meses), textoOuVazio(c.observacoes),
+    textoOuVazio(c.objeto), dataOuNulo(c.data_assinatura), textoOuVazio(c.observacoes),
+    numeroOuNulo(c.valor), dataOuNulo(c.data_vencimento), numeroOuNulo(c.vigencia_meses),
     agora(), id,
   );
+  recalcularContrato(id);
   res.json(montarContrato(id));
 }));
 
@@ -232,6 +243,7 @@ api.delete('/contratos/:id', rota((req, res) => {
   for (const arquivo of [
     contrato.arquivo,
     ...all('SELECT arquivo FROM rts WHERE contrato_id = ?', id).map((r) => r.arquivo),
+    ...all('SELECT arquivo FROM aditivos WHERE contrato_id = ?', id).map((a) => a.arquivo),
     ...all('SELECT arquivo FROM documentos WHERE contrato_id = ?', id).map((d) => d.arquivo),
   ]) {
     if (arquivo) remover(arquivo);
@@ -262,7 +274,7 @@ api.post('/contratos/:id/status', rota((req, res) => {
       `UPDATE rts SET status = 'baixada', atualizado_em = ? WHERE contrato_id = ? AND status = 'emitida'`,
       agora(), id,
     );
-    registrarEvento(id, 'contrato_concluido', `Contrato concluído em ${dataConclusao}.`);
+    registrarEvento(id, 'contrato_concluido', `Contrato concluído em ${formatarData(dataConclusao)}.`);
   } else {
     registrarEvento(id, 'contrato_status', `Situação alterada para ${status}.`);
   }
@@ -278,6 +290,112 @@ api.get('/contratos/:id/arquivo', rota((req, res) => {
 
 api.get('/contratos/:id/eventos', rota((req, res) => {
   res.json(all('SELECT * FROM eventos WHERE contrato_id = ? ORDER BY criado_em DESC LIMIT 100', Number(req.params.id)));
+}));
+
+/* ---------------------------------------------------------------- aditivos */
+
+api.post('/contratos/:id/aditivos/analisar', upload.single('arquivo'), rota(async (req, res) => {
+  const contrato = get('SELECT * FROM contratos WHERE id = ?', Number(req.params.id));
+  exigir(contrato, 'Contrato não encontrado.', 404);
+  exigir(req.file, 'Selecione o PDF do termo aditivo.');
+
+  const { texto, temTexto } = await extrairTexto(req.file.buffer);
+  exigir(
+    temTexto,
+    'Não foi possível ler texto deste PDF. Provavelmente é um documento digitalizado (imagem). '
+    + 'Passe um OCR no arquivo ou registre o aditivo manualmente.',
+  );
+
+  const extraidos = analisarAditivo(texto, contrato);
+  const proximaOrdem = all('SELECT COUNT(*) AS total FROM aditivos WHERE contrato_id = ?', contrato.id)[0].total + 1;
+  if (!extraidos.numero) extraidos.numero = `${proximaOrdem}º Termo Aditivo`;
+
+  const token = guardarTemporario(req.file.buffer, req.file.originalname, { texto });
+  res.json({ token, extraidos });
+}));
+
+api.post('/contratos/:id/aditivos', rota((req, res) => {
+  const contratoId = Number(req.params.id);
+  const contrato = get('SELECT * FROM contratos WHERE id = ?', contratoId);
+  exigir(contrato, 'Contrato não encontrado.', 404);
+
+  const c = req.body ?? {};
+  const novaData = dataOuNulo(c.nova_data_vencimento);
+  const valorAcrescido = numeroOuNulo(c.valor_acrescido);
+  exigir(
+    novaData || valorAcrescido !== null || textoOuVazio(c.objeto),
+    'Informe ao menos a nova data de vencimento, o valor acrescido ou o objeto do aditivo.',
+  );
+
+  let arquivo = null;
+  let arquivoNome = null;
+  let texto = null;
+  if (c.token) {
+    const tmp = lerTemporario(c.token);
+    exigir(tmp, 'O arquivo enviado expirou. Faça o upload novamente.');
+    texto = tmp.texto ?? null;
+    const efetivado = efetivar(c.token, `aditivo-${contrato.numero.replace(/\W+/g, '-')}`);
+    arquivo = efetivado?.arquivo ?? null;
+    arquivoNome = efetivado?.arquivo_nome ?? null;
+  }
+
+  const agoraIso = agora();
+  const { id } = run(
+    `INSERT INTO aditivos (contrato_id, numero, tipo, data_assinatura, prazo_meses,
+                           nova_data_vencimento, valor_acrescido, objeto, observacoes,
+                           arquivo, arquivo_nome, texto, criado_em, atualizado_em)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    contratoId, textoOuVazio(c.numero) || 'Termo Aditivo', textoOuVazio(c.tipo) || 'prazo',
+    dataOuNulo(c.data_assinatura), numeroOuNulo(c.prazo_meses), novaData, valorAcrescido,
+    textoOuVazio(c.objeto), textoOuVazio(c.observacoes), arquivo, arquivoNome, texto,
+    agoraIso, agoraIso,
+  );
+
+  // modalidades novas trazidas pelo aditivo entram como pendentes
+  const novasDisciplinas = (Array.isArray(c.disciplinas) ? c.disciplinas : [])
+    .filter((d) => IDS_DISCIPLINAS.includes(d))
+    .filter((d) => !get('SELECT id FROM rts WHERE contrato_id = ? AND disciplina = ?', contratoId, d));
+
+  for (const disciplina of novasDisciplinas) {
+    run(
+      `INSERT INTO rts (contrato_id, disciplina, status, motivo, origem, criado_em, atualizado_em)
+       VALUES (?, ?, 'pendente', ?, 'automatica', ?, ?)`,
+      contratoId, disciplina, `acrescentada pelo ${textoOuVazio(c.numero) || 'termo aditivo'}`,
+      agoraIso, agoraIso,
+    );
+  }
+
+  const atualizado = recalcularContrato(contratoId);
+
+  registrarEvento(contratoId, 'aditivo_registrado',
+    `${textoOuVazio(c.numero) || 'Termo aditivo'} registrado`
+    + `${novaData ? ` — vigência até ${formatarData(novaData)}` : ''}`
+    + `${valorAcrescido ? ` — valor ${valorAcrescido > 0 ? 'acrescido' : 'suprimido'} de ${formatarMoeda(Math.abs(valorAcrescido))}` : ''}`
+    + `${novasDisciplinas.length ? ` — ${novasDisciplinas.length} nova(s) RT pendente(s)` : ''}.`);
+
+  // se a prorrogacao trouxe o contrato de volta para dentro do prazo, ele volta a ativo
+  if (atualizado?.status === 'concluido' && novaData && novaData >= hojeISO()) {
+    run(`UPDATE contratos SET status = 'ativo', data_conclusao = NULL, atualizado_em = ? WHERE id = ?`, agoraIso, contratoId);
+    registrarEvento(contratoId, 'contrato_reaberto', 'Contrato reaberto pela prorrogação do termo aditivo.');
+  }
+
+  res.status(201).json({ ...montarContrato(contratoId), aditivo_id: id });
+}));
+
+api.delete('/aditivos/:id', rota((req, res) => {
+  const aditivo = get('SELECT * FROM aditivos WHERE id = ?', Number(req.params.id));
+  exigir(aditivo, 'Termo aditivo não encontrado.', 404);
+  if (aditivo.arquivo) remover(aditivo.arquivo);
+  run('DELETE FROM aditivos WHERE id = ?', aditivo.id);
+  recalcularContrato(aditivo.contrato_id);
+  registrarEvento(aditivo.contrato_id, 'aditivo_removido', `${aditivo.numero} removido.`);
+  res.json(montarContrato(aditivo.contrato_id));
+}));
+
+api.get('/aditivos/:id/arquivo', rota((req, res) => {
+  const aditivo = get('SELECT arquivo, arquivo_nome, numero FROM aditivos WHERE id = ?', Number(req.params.id));
+  exigir(aditivo?.arquivo, 'Este termo aditivo não tem PDF anexado.', 404);
+  enviarPdf(res, aditivo.arquivo, aditivo.arquivo_nome || `${aditivo.numero}.pdf`);
 }));
 
 /* -------------------------------------------------------------------- RTs */
@@ -410,8 +528,14 @@ api.post('/contratos/:id/cat', rota(async (req, res) => {
 
   const criadoEm = agora();
   const gerados = [];
+  const aditivos = all(
+    `SELECT * FROM aditivos WHERE contrato_id = ? ORDER BY COALESCE(data_assinatura, '9999'), id`,
+    id,
+  );
 
-  const atestado = await gerarAtestado({ contrato, rts: comArt.map((rt) => ({ ...rt, status: 'emitida' })), empresa });
+  const atestado = await gerarAtestado({
+    contrato, rts: comArt.map((rt) => ({ ...rt, status: 'emitida' })), empresa, aditivos,
+  });
   const arquivoAtestado = gravarGerado(atestado, `atestado-${contrato.numero.replace(/\W+/g, '-')}`);
   const nomeAtestado = `Atestado de Capacidade Tecnica - Contrato ${contrato.numero.replace(/\W+/g, '-')}.pdf`;
   const { id: idAtestado } = run(
@@ -423,7 +547,7 @@ api.post('/contratos/:id/cat', rota(async (req, res) => {
   gerados.push(idAtestado);
 
   for (const rt of comArt) {
-    const bytes = await gerarRequerimentoCat({ contrato, rt, empresa });
+    const bytes = await gerarRequerimentoCat({ contrato, rt, empresa, aditivos });
     const arquivo = gravarGerado(bytes, `requerimento-cat-${rt.disciplina}`);
     const nome = `Requerimento CAT - ${DISCIPLINAS[rt.disciplina].nome} - Contrato ${contrato.numero.replace(/\W+/g, '-')}.pdf`;
     const { id: idDoc } = run(

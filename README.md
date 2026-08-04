@@ -15,14 +15,21 @@ documentos de CAT — do PDF do contrato assinado até o atestado pronto para a 
    o registro no CREA, o RNP e as datas, e vincula à modalidade correspondente.
 5. **Perto do vencimento da ART, o painel avisa** (prazo configurável, 60 dias por padrão).
    O mesmo vale para o vencimento do contrato (90 dias por padrão).
-6. **Ao concluir o contrato**, as ARTs emitidas passam a baixadas e o contrato entra na fila de
+6. **Prorrogou ou aditivou? Sobe o PDF do termo aditivo.** O sistema lê a prorrogação de prazo e o
+   acréscimo (ou supressão) de valor, recalcula vigência, valor e prazo total do contrato, e
+   detecta se o aditivo trouxe serviço de uma modalidade que ainda não tinha RT.
+   Se alguma ART já emitida terminar **antes** da nova vigência, ele aponta a necessidade de
+   **ART complementar** — o furo de cobertura que passa despercebido com mais frequência.
+7. **Ao concluir o contrato**, as ARTs emitidas passam a baixadas e o contrato entra na fila de
    **gerar CAT**.
-7. **Gerar CAT produz dois tipos de documento em PDF:**
+8. **Gerar CAT produz dois tipos de documento em PDF:**
    - **Atestado de Capacidade Técnica** — o modelo para o órgão contratante assinar, com os
      elementos exigidos pelo art. 57 da Resolução nº 1.025/2009 do CONFEA (identificação das
      partes, contrato, período de execução, descrição dos serviços e profissionais com as ARTs).
    - **Requerimento de CAT** — um por ART, consolidando os dados do profissional, da ART, do
      contrato e a relação de anexos, para protocolar no CREA.
+
+   Os termos aditivos entram nos dois documentos — o CREA exige o contrato **e** os aditivos.
 
 > **Sobre a CAT:** a Certidão de Acervo Técnico é expedida pelo CREA, não pela contratada.
 > O que o sistema gera é o atestado (que o contratante assina) e o requerimento com todos os
@@ -68,8 +75,16 @@ npm test
 ```
 
 Sobe a aplicação numa porta efêmera e percorre o caminho inteiro: leitura do PDF do contrato,
-detecção das RTs, importação da ART, alerta de vencimento, conclusão, geração da CAT e conferência
-do texto dos PDFs gerados.
+detecção das RTs, importação da ART, alerta de vencimento, registro e remoção de termo aditivo
+(com recálculo de vigência e valor), detecção de ART complementar, conclusão, geração da CAT e
+conferência do texto dos PDFs gerados.
+
+### Como os valores do contrato são calculados
+
+O contrato guarda os valores **originais** (`data_vencimento_original`, `valor_original`,
+`vigencia_meses_original`). Vencimento, valor e vigência correntes são sempre recalculados a
+partir deles somando os termos aditivos — por isso remover um aditivo devolve o contrato ao estado
+anterior sem sobras, e editar o contrato edita a base, não o resultado.
 
 ## Estrutura
 
@@ -86,6 +101,7 @@ contratos-rt/
 │   ├── extract/
 │   │   ├── pdfTexto.js        # extração de texto (pdf.js)
 │   │   ├── contrato.js        # leitura do contrato + detecção das RTs
+│   │   ├── aditivo.js         # leitura do termo aditivo
 │   │   └── art.js             # leitura da ART
 │   ├── docs/
 │   │   ├── layout.js          # montagem de PDF A4 (pdf-lib)

@@ -23,11 +23,18 @@ function prazoTexto(contrato) {
   return `${n} (${porExtenso(n)}) ${n === 1 ? 'mês' : 'meses'}`;
 }
 
+const ROTULO_TIPO_ADITIVO = {
+  prazo: 'Prorrogação de prazo',
+  valor: 'Alteração de valor',
+  prazo_valor: 'Prazo e valor',
+  escopo: 'Alteração de escopo',
+};
+
 /**
- * @param {{ contrato: object, rts: object[], empresa: object }} dados
+ * @param {{ contrato: object, rts: object[], empresa: object, aditivos?: object[] }} dados
  * @returns {Promise<Uint8Array>}
  */
-export async function gerarAtestado({ contrato, rts, empresa }) {
+export async function gerarAtestado({ contrato, rts, empresa, aditivos = [] }) {
   const doc = await novoDocumento({
     rodape: `Atestado de Capacidade Técnica — Contrato nº ${contrato.numero} — ${empresa.razao_social || 'contratada'}`,
   });
@@ -78,7 +85,30 @@ export async function gerarAtestado({ contrato, rts, empresa }) {
     ['Data de conclusão dos serviços', formatarData(contrato.data_conclusao) || '—'],
   ]);
 
-  doc.secao('3. Objeto e serviços executados');
+  if (aditivos.length) {
+    doc.secao('3. Termos aditivos');
+    doc.tabela({
+      colunas: [
+        { titulo: 'Termo', largura: 24 },
+        { titulo: 'Assinatura', largura: 16 },
+        { titulo: 'Alteração', largura: 24 },
+        { titulo: 'Efeito', largura: 36 },
+      ],
+      linhas: aditivos.map((a) => [
+        a.numero || 'Termo aditivo',
+        formatarData(a.data_assinatura) || '—',
+        ROTULO_TIPO_ADITIVO[a.tipo] ?? a.tipo,
+        [
+          a.nova_data_vencimento ? `vigência até ${formatarData(a.nova_data_vencimento)}` : '',
+          a.valor_acrescido
+            ? `${a.valor_acrescido > 0 ? 'acréscimo' : 'supressão'} de ${formatarMoeda(Math.abs(a.valor_acrescido))}`
+            : '',
+        ].filter(Boolean).join('; ') || (a.objeto ? a.objeto.slice(0, 90) : '—'),
+      ]),
+    });
+  }
+
+  doc.secao(`${aditivos.length ? 4 : 3}. Objeto e serviços executados`);
   doc.paragrafo(contrato.objeto || '[Descrever o objeto contratual e os serviços efetivamente executados]');
 
   if (emitidas.length) {
@@ -95,7 +125,7 @@ export async function gerarAtestado({ contrato, rts, empresa }) {
     });
   }
 
-  doc.secao('4. Responsáveis técnicos e ARTs');
+  doc.secao(`${aditivos.length ? 5 : 4}. Responsáveis técnicos e ARTs`);
   if (emitidas.length) {
     doc.tabela({
       colunas: [
@@ -117,7 +147,7 @@ export async function gerarAtestado({ contrato, rts, empresa }) {
     doc.paragrafo('[Nenhuma ART registrada no sistema para este contrato — informe os profissionais e as ARTs correspondentes.]');
   }
 
-  doc.secao('5. Avaliação da execução');
+  doc.secao(`${aditivos.length ? 6 : 5}. Avaliação da execução`);
   doc.paragrafo(
     'Declaramos que os serviços foram executados dentro dos prazos e das especificações contratuais, '
     + 'nada constando que desabone a conduta técnica e comercial da empresa contratada, '

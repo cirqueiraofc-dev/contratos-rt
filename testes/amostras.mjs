@@ -56,12 +56,19 @@ export function datasExemplo(referencia = new Date()) {
   const inicioArt = iso(ano, mes, 20);
   const registroArt = iso(ano, mes, 19);
 
+  // 1o termo aditivo: assinado pouco antes do vencimento, prorroga por mais 12 meses
+  const assinaturaAditivo = iso(ano + 1, mes, 1);
+  const vencimentoProrrogado = iso(ano + 2, mes, 14);
+
   return {
     assinatura,
     vencimento,
     inicioArt,
     registroArt,
+    assinaturaAditivo,
+    vencimentoProrrogado,
     assinaturaExtenso: `15 de ${MESES[mes - 1]} de ${ano}`,
+    assinaturaAditivoExtenso: `1 de ${MESES[mes - 1]} de ${ano + 1}`,
   };
 }
 
@@ -134,5 +141,33 @@ export function linhasArt(datas = datasExemplo()) {
   ];
 }
 
+export function linhasAditivo(datas = datasExemplo()) {
+  return [
+    'PREFEITURA MUNICIPAL DE RIBEIRÃO PRETO',
+    'SECRETARIA MUNICIPAL DA SAÚDE',
+    '',
+    'PRIMEIRO TERMO ADITIVO AO CONTRATO ADMINISTRATIVO Nº 045/2025',
+    '',
+    'CLÁUSULA PRIMEIRA - DO OBJETO',
+    'O presente termo aditivo tem por objeto a prorrogação do prazo de vigência do contrato e o'
+      + ' acréscimo ao escopo dos serviços de manutenção preventiva e corretiva dos elevadores e'
+      + ' das plataformas elevatórias das unidades de saúde do município.',
+    '',
+    'CLÁUSULA SEGUNDA - DA PRORROGAÇÃO',
+    'Fica prorrogado o prazo de vigência do contrato por mais 12 (doze) meses, contados do dia'
+      + ' seguinte ao término da vigência atual, nos termos da legislação aplicável.',
+    '',
+    'CLÁUSULA TERCEIRA - DO VALOR',
+    'Fica acrescido ao contrato o valor de R$ 128.450,00 (cento e vinte e oito mil, quatrocentos e'
+      + ' cinquenta reais), passando o valor total do contrato para R$ 1.412.950,00.',
+    '',
+    'CLÁUSULA QUARTA - DA RATIFICAÇÃO',
+    'Ficam ratificadas as demais cláusulas do contrato original não alteradas por este instrumento.',
+    '',
+    `Ribeirão Preto, ${datas.assinaturaAditivoExtenso}.`,
+  ];
+}
+
 export const pdfContrato = (datas) => montarPdf(linhasContrato(datas));
 export const pdfArt = (datas) => montarPdf(linhasArt(datas));
+export const pdfAditivo = (datas) => montarPdf(linhasAditivo(datas));

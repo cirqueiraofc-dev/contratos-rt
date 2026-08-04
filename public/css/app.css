@@ -204,6 +204,8 @@ p { margin: 0 0 .6em; }
 .rt-cabecalho .direita { margin-left: auto; }
 .rt-dados { font-size: 12.5px; color: var(--texto-fraco); display: grid; gap: 2px; }
 .rt-dados b { color: var(--texto); font-weight: 600; }
+/* avisos longos dentro do cartao precisam quebrar em vez de estourar a borda */
+.rt-dados .etiqueta { white-space: normal; text-align: left; }
 .rt-acoes { display: flex; gap: 6px; flex-wrap: wrap; margin-top: auto; padding-top: 4px; }
 
 /* --------------------------------------------------------------- tabelas */

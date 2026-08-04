@@ -11,10 +11,10 @@ import { DISCIPLINAS } from '../disciplinas.js';
 import { dataPorExtenso, formatarData, formatarMoeda, hojeISO } from '../texto.js';
 
 /**
- * @param {{ contrato: object, rt: object, empresa: object }} dados
+ * @param {{ contrato: object, rt: object, empresa: object, aditivos?: object[] }} dados
  * @returns {Promise<Uint8Array>}
  */
-export async function gerarRequerimentoCat({ contrato, rt, empresa }) {
+export async function gerarRequerimentoCat({ contrato, rt, empresa, aditivos = [] }) {
   const modalidade = DISCIPLINAS[rt.disciplina]?.nome ?? rt.disciplina;
   const doc = await novoDocumento({
     rodape: `Requerimento de CAT — Contrato nº ${contrato.numero} — ART ${rt.numero_art || 's/nº'} — ${modalidade}`,
@@ -67,6 +67,17 @@ export async function gerarRequerimentoCat({ contrato, rt, empresa }) {
     ['Conclusão dos serviços', formatarData(contrato.data_conclusao || contrato.data_vencimento) || '—'],
     ['Valor do contrato', formatarMoeda(contrato.valor) || '—'],
   ]);
+
+  if (aditivos.length) {
+    doc.campo(
+      'Termos aditivos',
+      aditivos.map((a) => [
+        a.numero || 'Termo aditivo',
+        a.data_assinatura ? `de ${formatarData(a.data_assinatura)}` : '',
+        a.nova_data_vencimento ? `(vigência até ${formatarData(a.nova_data_vencimento)})` : '',
+      ].filter(Boolean).join(' ')).join('; '),
+    );
+  }
 
   doc.secao('4. Objeto');
   doc.paragrafo(contrato.objeto || '[Descrever o objeto do contrato]');

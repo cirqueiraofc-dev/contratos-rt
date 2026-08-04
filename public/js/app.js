@@ -2,6 +2,7 @@ import { api } from './api.js';
 import { telaConfiguracoes, telaContrato, telaContratos, telaPainel } from './telas.js';
 import {
   fluxoConcluir, fluxoEditarContrato, fluxoEditarRt, fluxoImportarArt, fluxoNovoContrato,
+  fluxoRegistrarAditivo,
 } from './modais.js';
 import { $, $$, aviso, escapar, formatarDataHora, lerCampos } from './util.js';
 
@@ -130,6 +131,13 @@ function desenharContrato() {
       await api.removerContrato(contrato.id);
       aviso('Contrato excluído.', 'sucesso');
       irPara('#/contratos');
+    },
+    'novo-aditivo': () => fluxoRegistrarAditivo(contrato, recarregar),
+    'remover-aditivo': async (botao) => {
+      const aditivo = contrato.aditivos.find((a) => a.id === Number(botao.dataset.aditivo));
+      if (!confirm(`Remover o ${aditivo.numero}? A vigência e o valor do contrato voltam ao que eram antes dele.`)) return;
+      recarregar(await api.removerAditivo(aditivo.id));
+      aviso('Termo aditivo removido e contrato recalculado.', 'sucesso');
     },
     'subir-art': (botao) => {
       const rt = contrato.rts.find((r) => r.id === Number(botao.dataset.rt));

@@ -15,13 +15,13 @@ const RE_CNPJ = /\b\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2}\b/g;
 const RE_VALOR = /R\$\s*([\d.]{1,15},\d{2})/g;
 
 /** Retorna um trecho do texto ao redor de um indice, para servir de evidencia. */
-function trechoAoRedor(texto, indice, tamanho = 130) {
+export function trechoAoRedor(texto, indice, tamanho = 130) {
   const ini = Math.max(0, indice - Math.floor(tamanho / 3));
   const fim = Math.min(texto.length, indice + tamanho);
   return `${ini > 0 ? '…' : ''}${limparEspacos(texto.slice(ini, fim))}${fim < texto.length ? '…' : ''}`;
 }
 
-function acharNumeroContrato(texto) {
+export function acharNumeroContrato(texto) {
   const padroes = [
     /\bcontrato\s+(?:administrativo\s+)?(?:de\s+presta[cç][aã]o\s+de\s+servi[cç]os\s+)?n[ºo°.\s]*\s*([\d]{1,6}\s*[\/.-]\s*\d{2,4})/i,
     /\btermo\s+de\s+contrato\s+n[ºo°.\s]*\s*([\d]{1,6}\s*[\/.-]\s*\d{2,4})/i,
@@ -83,7 +83,7 @@ function acharValor(texto) {
   return lista.reduce((maior, c) => (c.valor > maior ? c.valor : maior), 0) || null;
 }
 
-function acharDataAssinatura(texto) {
+export function acharDataAssinatura(texto) {
   const datas = acharDatas(texto);
   if (!datas.length) return { data: null, origem: '' };
   const norm = normalizar(texto);
