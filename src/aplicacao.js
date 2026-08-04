@@ -12,6 +12,11 @@ export function criarAplicacao({ senha = '' } = {}) {
   const app = express();
   app.disable('x-powered-by');
 
+  // Verificacao de saude para o servico de hospedagem — fica antes da protecao
+  // por senha, senao a plataforma recebe 401 e considera a aplicacao no ar como
+  // se estivesse quebrada. Nao devolve nenhum dado.
+  app.get('/saude', (_req, res) => res.json({ ok: true }));
+
   // Protecao opcional por senha: sem APP_SENHA o sistema roda aberto, que e o
   // esperado para uso local. Ao publicar em rede, defina a variavel.
   if (senha) {

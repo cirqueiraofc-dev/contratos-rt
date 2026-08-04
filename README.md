@@ -63,6 +63,11 @@ Para fazer backup, basta copiar essas duas pastas.
 Rodando só na sua máquina, pode deixar sem senha. **Se publicar em rede, defina `APP_SENHA`**
 e coloque atrás de HTTPS.
 
+### Publicar na internet
+
+Veja **[DEPLOY.md](DEPLOY.md)** — o repositório já traz um `render.yaml` pronto, com disco
+persistente configurado. Cerca de 10 minutos do zero até acessar por link, com senha.
+
 ### Primeiro uso
 
 Vá em **Configurações** e preencha os dados da empresa (razão social, CNPJ, registro no CREA,

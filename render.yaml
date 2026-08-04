@@ -1,0 +1,32 @@
+# Configuracao de deploy no Render.
+#
+# Com disco persistente: contratos, PDFs e banco sobrevivem a reinicios e novos
+# deploys. O disco exige plano pago (starter). Para testar de graca primeiro,
+# veja DEPLOY.md — basta remover o bloco `disk` e as duas variaveis de caminho.
+services:
+  - type: web
+    name: contratos-rt
+    runtime: node
+    plan: starter
+    region: oregon
+    branch: main
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /saude
+
+    # o disco fica montado fora da pasta do codigo, que e substituida a cada deploy
+    disk:
+      name: dados
+      mountPath: /var/dados
+      sizeGB: 1
+
+    envVars:
+      - key: NODE_VERSION
+        value: 22.20.0
+      - key: DATA_DIR
+        value: /var/dados/data
+      - key: UPLOAD_DIR
+        value: /var/dados/uploads
+      # senha de acesso: definida no painel do Render, nunca no repositorio
+      - key: APP_SENHA
+        sync: false
