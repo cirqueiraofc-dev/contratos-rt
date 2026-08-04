@@ -8,7 +8,9 @@ services:
     name: contratos-rt
     runtime: node
     plan: starter
-    region: oregon
+    # Virginia e a regiao do Render mais proxima do Brasil (nao ha data center
+    # na America do Sul); Oregon fica na costa oposta e dobra a latencia.
+    region: virginia
     branch: main
     buildCommand: npm ci
     startCommand: npm start
