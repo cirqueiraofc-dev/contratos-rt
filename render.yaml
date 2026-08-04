@@ -1,36 +1,35 @@
-# Configuracao de deploy no Render.
+# Configuracao de deploy no Render — versao GRATUITA, para a cliente testar.
 #
-# Com disco persistente: contratos, PDFs e banco sobrevivem a reinicios e novos
-# deploys. O disco exige plano pago (starter). Para testar de graca primeiro,
-# veja DEPLOY.md — basta remover o bloco `disk` e as duas variaveis de caminho.
+# Este e o arquivo lido por padrao pelo Render (raiz do repositorio), entao
+# criar o Blueprint nao pede cartao nem exige preencher nenhum caminho.
+#
+# ATENCAO — DUAS LIMITACOES, e elas importam:
+#   1. O servico HIBERNA depois de ~15 min parado. A primeira visita depois
+#      disso demora uns 50 segundos carregando.
+#   2. NAO HA DISCO PERSISTENTE. O banco e os PDFs sao apagados a cada
+#      reinicio ou deploy. Serve para experimentar a ferramenta, NAO para
+#      guardar contrato de verdade.
+#
+# ANTES DE ENTRAR O PRIMEIRO CONTRATO REAL, troque para `render-producao.yaml`,
+# que tem disco persistente. Veja DEPLOY.md.
 services:
   - type: web
     name: contratos-rt
     runtime: node
-    plan: starter
     # Virginia e a regiao do Render mais proxima do Brasil (nao ha data center
     # na America do Sul); Oregon fica na costa oposta e dobra a latencia.
     region: virginia
+    plan: free
     branch: main
     buildCommand: npm ci
     startCommand: npm start
     healthCheckPath: /saude
-
-    # o disco fica montado fora da pasta do codigo, que e substituida a cada deploy
-    disk:
-      name: dados
-      mountPath: /var/dados
-      sizeGB: 1
 
     envVars:
       # major apenas: o Render resolve para o 22.x mais recente, e qualquer
       # 22.5+ serve (e a versao em que o SQLite embutido do Node apareceu)
       - key: NODE_VERSION
         value: "22"
-      - key: DATA_DIR
-        value: /var/dados/data
-      - key: UPLOAD_DIR
-        value: /var/dados/uploads
       # senha de acesso: definida no painel do Render, nunca no repositorio
       - key: APP_SENHA
         sync: false

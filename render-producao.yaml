@@ -1,0 +1,40 @@
+# Configuracao de deploy no Render — versao de PRODUCAO, com disco persistente.
+#
+# Use este arquivo quando o sistema for guardar contrato de verdade: os PDFs e o
+# banco sobrevivem a reinicios e a novos deploys.
+#
+# Exige instancia paga (~US$ 7/mes + ~US$ 0,25/mes pelo disco de 1 GB), porque
+# disco persistente no Render nao existe no plano gratuito.
+#
+# COMO USAR: veja DEPLOY.md. O caminho mais simples e renomear os arquivos —
+# este vira `render.yaml` e o gratuito sai da raiz — para nao depender do campo
+# "Blueprint Path", que nem sempre aparece na tela de criacao.
+services:
+  - type: web
+    name: contratos-rt
+    runtime: node
+    # Virginia e a regiao do Render mais proxima do Brasil (nao ha data center
+    # na America do Sul); Oregon fica na costa oposta e dobra a latencia.
+    region: virginia
+    plan: starter
+    branch: main
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /saude
+
+    # o disco fica montado fora da pasta do codigo, que e substituida a cada deploy
+    disk:
+      name: dados
+      mountPath: /var/dados
+      sizeGB: 1
+
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATA_DIR
+        value: /var/dados/data
+      - key: UPLOAD_DIR
+        value: /var/dados/uploads
+      # senha de acesso: definida no painel do Render, nunca no repositorio
+      - key: APP_SENHA
+        sync: false

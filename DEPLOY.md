@@ -1,6 +1,14 @@
 # Publicar o sistema na internet
 
-O repositório já vem com `render.yaml` pronto. O passo a passo abaixo leva uns 10 minutos.
+O repositório traz dois arquivos de configuração prontos:
+
+| Arquivo                 | Para que serve                                                    |
+| ----------------------- | ----------------------------------------------------------------- |
+| `render.yaml`           | **Padrão.** Plano gratuito, sem cartão. Para a cliente testar.     |
+| `render-producao.yaml`  | Plano pago com disco persistente. Para contrato de verdade.        |
+
+O Render lê o `render.yaml` da raiz automaticamente, então subir a versão de teste é só
+conectar o repositório e dar Apply.
 
 ## Por que Render (e por que não Cloudflare)
 
@@ -13,46 +21,48 @@ se o disco reinicia zerado, os contratos e as ARTs somem.
 - **VPS** (Hetzner, DigitalOcean) sai mais barato a longo prazo, mas você assume systemd,
   nginx, certificado TLS e backup na mão.
 
-## Opção recomendada — Render com disco (produção)
-
-Plano `starter` + disco de 1 GB: cerca de **US$ 8/mês**. Sem hibernação, dado preservado.
+## Subir para teste (grátis, sem cartão)
 
 1. Acesse <https://dashboard.render.com> e entre com a conta do GitHub.
-2. **New** → **Blueprint** → escolha o repositório `contratos-rt`.
-   O Render lê o `render.yaml` e monta o serviço sozinho.
-3. Ele vai pedir o valor de `APP_SENHA` (é a única variável marcada como `sync: false`).
-   Defina uma senha forte — é ela que protege o acesso ao sistema.
-4. **Apply**. O primeiro deploy leva de 2 a 4 minutos.
-5. Abra a URL que o Render gerar (`https://contratos-rt.onrender.com` ou parecida).
-   O navegador vai pedir a senha: usuário em branco, senha a que você definiu.
-6. Vá em **Configurações** no sistema e preencha os dados da empresa.
+2. **+ New** → **Blueprint** → **Connect** no repositório `contratos-rt`.
+3. Dê um nome ao Blueprint e confira que a branch é `main`. Não precisa mexer em mais nada —
+   o `render.yaml` da raiz já é o gratuito.
+4. Ele vai pedir o valor de `APP_SENHA` (é a única variável marcada como `sync: false`).
+   Defina uma senha forte e guarde — é ela que protege o acesso ao sistema.
+5. **Apply**. O primeiro deploy leva de 2 a 4 minutos.
+6. Abra a URL gerada (`https://contratos-rt.onrender.com` ou parecida).
+   O navegador pede a senha: **usuário em branco**, senha a que você definiu.
+7. Vá em **Configurações** no sistema e preencha os dados da empresa.
 
-## Opção grátis — só para a cliente testar
+### O que avisar antes de mandar o link
 
-Funciona, com duas limitações que você precisa avisar antes:
+- **Hiberna** após ~15 minutos parado; a primeira visita depois disso demora uns 50 segundos.
+- **O disco é apagado** a cada reinício ou deploy — o que ela cadastrar some. É demonstração.
+- **0,1 de CPU**: ler um PDF, que é a parte pesada, leva alguns segundos em vez de um.
 
-- **O serviço hiberna** após ~15 minutos parado. A primeira visita depois disso demora
-  uns 50 segundos carregando.
-- **O disco é apagado** a cada reinício ou deploy. Serve para testar a ferramenta,
-  não para guardar contrato de verdade.
+## Passar para produção (com disco)
 
-Não precisa editar nada: o repositório já traz o arquivo **`render-gratis.yaml`** pronto.
+Cerca de **US$ 7,25/mês** (instância `starter` ~US$ 7 + disco de 1 GB ~US$ 0,25). Sem hibernação
+e sem perder dado. Faça isso **antes de entrar o primeiro contrato real**.
 
-Na tela de criação do Blueprint, preencha o campo **Blueprint Path** com:
+1. No repositório, troque os arquivos de lugar:
 
-```
-render-gratis.yaml
-```
+   ```bash
+   git mv render.yaml render-teste.yaml
+   git mv render-producao.yaml render.yaml
+   git commit -m "Passa o deploy para producao" && git push
+   ```
 
-O Render passa a ler esse arquivo em vez do `render.yaml` da raiz, e não pede cartão.
+   Trocar os nomes evita depender do campo **Blueprint Path** da tela de criação, que nem
+   sempre aparece.
 
-Migrar depois para o pago é criar um Blueprint novo deixando o **Blueprint Path** em branco
-(aí ele volta a ler o `render.yaml` com disco). O código não muda em nenhum dos casos.
+2. No Render, **apague o serviço gratuito** (Settings → Delete). Isso libera o nome
+   `contratos-rt`, e a URL final continua a mesma.
+3. Crie o Blueprint de novo: **+ New** → **Blueprint** → mesmo repositório → **Apply**.
+   Agora ele pede o cartão, porque o disco é recurso pago.
+4. Preencha os dados da empresa outra vez — o banco do serviço antigo não vem junto.
 
-> Se você já começou a criar o Blueprint e apareceu **"A Blueprint file was found, but there was
-> an issue"** junto com a janela de cartão: não é erro no arquivo. É o `render.yaml` da raiz
-> pedindo disco, que é recurso pago. Clique em **Cancel**, preencha o Blueprint Path com
-> `render-gratis.yaml` e clique em **Retry**.
+O código da aplicação não muda em nenhum dos dois casos.
 
 ## Backup
 
