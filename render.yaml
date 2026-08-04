@@ -23,8 +23,10 @@ services:
       sizeGB: 1
 
     envVars:
+      # major apenas: o Render resolve para o 22.x mais recente, e qualquer
+      # 22.5+ serve (e a versao em que o SQLite embutido do Node apareceu)
       - key: NODE_VERSION
-        value: 22.20.0
+        value: "22"
       - key: DATA_DIR
         value: /var/dados/data
       - key: UPLOAD_DIR

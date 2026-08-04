@@ -1,0 +1,29 @@
+# Variante gratuita do deploy no Render — para a cliente testar, sem cartao.
+#
+# Use este arquivo preenchendo "Blueprint Path" com `render-gratis.yaml`
+# na tela de criacao do Blueprint.
+#
+# DUAS LIMITACOES, e elas importam:
+#   1. O servico HIBERNA depois de ~15 min parado. A primeira visita depois
+#      disso demora uns 50 segundos carregando.
+#   2. NAO HA DISCO. O banco e os PDFs sao apagados a cada reinicio ou deploy.
+#      Serve para experimentar a ferramenta, NAO para guardar contrato de verdade.
+#
+# Para produção use o `render.yaml` da raiz, que tem disco persistente.
+services:
+  - type: web
+    name: contratos-rt-teste
+    runtime: node
+    plan: free
+    region: virginia
+    branch: main
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /saude
+
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # senha de acesso: definida no painel do Render, nunca no repositorio
+      - key: APP_SENHA
+        sync: false

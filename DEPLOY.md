@@ -36,14 +36,23 @@ Funciona, com duas limitações que você precisa avisar antes:
 - **O disco é apagado** a cada reinício ou deploy. Serve para testar a ferramenta,
   não para guardar contrato de verdade.
 
-Para usar assim, edite o `render.yaml` antes do passo 2:
+Não precisa editar nada: o repositório já traz o arquivo **`render-gratis.yaml`** pronto.
 
-- troque `plan: starter` por `plan: free`
-- apague o bloco `disk:` inteiro
-- apague as variáveis `DATA_DIR` e `UPLOAD_DIR`
+Na tela de criação do Blueprint, preencha o campo **Blueprint Path** com:
 
-Migrar depois para o plano pago é só desfazer essas três edições e reaplicar o Blueprint —
-o código não muda.
+```
+render-gratis.yaml
+```
+
+O Render passa a ler esse arquivo em vez do `render.yaml` da raiz, e não pede cartão.
+
+Migrar depois para o pago é criar um Blueprint novo deixando o **Blueprint Path** em branco
+(aí ele volta a ler o `render.yaml` com disco). O código não muda em nenhum dos casos.
+
+> Se você já começou a criar o Blueprint e apareceu **"A Blueprint file was found, but there was
+> an issue"** junto com a janela de cartão: não é erro no arquivo. É o `render.yaml` da raiz
+> pedindo disco, que é recurso pago. Clique em **Cancel**, preencha o Blueprint Path com
+> `render-gratis.yaml` e clique em **Retry**.
 
 ## Backup
 
