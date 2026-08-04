@@ -1,8 +1,32 @@
+import crypto from 'node:crypto';
 import express from 'express';
 import { api } from './routes/api.js';
 import { limparTemporarios } from './arquivos.js';
 import { PUBLIC_DIR } from './paths.js';
 import './db.js';
+
+/**
+ * Le a senha de um cabecalho Basic. O formato e "usuario:senha", e so o
+ * primeiro dois-pontos separa — senha com ":" dentro continua valendo inteira.
+ */
+function extrairSenha(credencial) {
+  let bruto;
+  try {
+    bruto = Buffer.from(credencial, 'base64').toString('utf8');
+  } catch {
+    return '';
+  }
+  const separador = bruto.indexOf(':');
+  return separador === -1 ? '' : bruto.slice(separador + 1);
+}
+
+/** Comparacao de tempo constante, para nao vazar a senha pelo tempo de resposta. */
+function senhaConfere(informada, esperada) {
+  const a = Buffer.from(String(informada), 'utf8');
+  const b = Buffer.from(String(esperada), 'utf8');
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
 
 /**
  * Monta a aplicacao Express. Separado de server.js para que os testes possam
@@ -19,12 +43,14 @@ export function criarAplicacao({ senha = '' } = {}) {
 
   // Protecao opcional por senha: sem APP_SENHA o sistema roda aberto, que e o
   // esperado para uso local. Ao publicar em rede, defina a variavel.
+  //
+  // O usuario e ignorado de proposito — so a senha vale. Quem acessa pode
+  // digitar qualquer coisa (ou nada) no campo de usuario.
   if (senha) {
     app.use((req, res, next) => {
       const [tipo, credencial] = (req.headers.authorization ?? '').split(' ');
       if (tipo === 'Basic' && credencial) {
-        const [, informada] = Buffer.from(credencial, 'base64').toString('utf8').split(':');
-        if (informada === senha) return next();
+        if (senhaConfere(extrairSenha(credencial), senha)) return next();
       }
       res.setHeader('WWW-Authenticate', 'Basic realm="Contratos e RT", charset="UTF-8"');
       return res.status(401).send('Acesso restrito.');

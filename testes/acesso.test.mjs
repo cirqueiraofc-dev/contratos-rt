@@ -14,7 +14,9 @@ process.env.UPLOAD_DIR = path.join(base, 'uploads');
 
 const { criarAplicacao } = await import('../src/aplicacao.js');
 
-const SENHA = 'senha-de-teste';
+// dois-pontos e acento de proposito: sao os casos que quebram uma leitura
+// ingenua do cabecalho Basic, e senha de gente de verdade tem disso
+const SENHA = 'Obra:2026#Ribeirão';
 let servidor;
 let url;
 
@@ -30,7 +32,7 @@ after(async () => {
 });
 
 const comSenha = (senha) => ({
-  headers: { Authorization: `Basic ${Buffer.from(`:${senha}`).toString('base64')}` },
+  headers: { Authorization: `Basic ${Buffer.from(`:${senha}`, 'utf8').toString('base64')}` },
 });
 
 test('a rota de saúde responde sem senha e não devolve dado nenhum', async () => {
@@ -48,8 +50,10 @@ test('sem senha, o sistema não abre', async () => {
 });
 
 test('senha errada continua barrada', async () => {
-  const resposta = await fetch(`${url}/api/painel`, comSenha('outra-coisa'));
-  assert.equal(resposta.status, 401);
+  for (const tentativa of ['outra-coisa', 'Obra', 'Obra:', '', 'Obra:2026#Ribeirão ']) {
+    const resposta = await fetch(`${url}/api/painel`, comSenha(tentativa));
+    assert.equal(resposta.status, 401, `"${tentativa}" não deveria entrar`);
+  }
 });
 
 test('com a senha certa, o sistema abre', async () => {
@@ -60,4 +64,14 @@ test('com a senha certa, o sistema abre', async () => {
   const painel = await fetch(`${url}/api/painel`, comSenha(SENHA));
   assert.equal(painel.status, 200);
   assert.equal((await painel.json()).indicadores.contratos_ativos, 0);
+});
+
+test('o usuário é ignorado: só a senha vale', async () => {
+  for (const usuario of ['', 'adm', 'admin', 'joão', 'qualquer coisa']) {
+    const credencial = Buffer.from(`${usuario}:${SENHA}`, 'utf8').toString('base64');
+    const resposta = await fetch(`${url}/api/painel`, {
+      headers: { Authorization: `Basic ${credencial}` },
+    });
+    assert.equal(resposta.status, 200, `usuário "${usuario}" deveria entrar`);
+  }
 });
