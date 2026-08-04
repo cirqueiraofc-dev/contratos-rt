@@ -1,42 +1,62 @@
+/* Identidade ECOART Soluções — cores amostradas em pixel na logo.
+   A logo e so texto: "eco" laranja, "art" indigo, "SOLUÇÕES" cinza.
+
+   Como as tres cores viram interface:
+     indigo  -> acento principal (links, botoes, item ativo do menu)
+     laranja -> alerta e acao, substituindo o ambar generico que havia antes
+     cinza   -> texto secundario e bordas
+
+   Para textos e bordas usamos versoes escurecidas do laranja: o laranja puro
+   sobre fundo claro nao alcanca contraste de leitura. O tom puro fica para
+   preenchimentos e para a marca. */
 :root {
-  --fundo: #f5f6f9;
+  --marca-laranja: #e5762d;
+  --marca-indigo: #40316a;
+  --marca-cinza: #a6a6a6;
+
+  --fundo: #f6f5f8;
   --superficie: #ffffff;
-  --superficie-2: #fafbfd;
-  --borda: #e2e5ec;
-  --texto: #1a1d26;
-  --texto-fraco: #676d7d;
-  --acento: #2a5bd7;
-  --acento-suave: #eaf0ff;
+  --superficie-2: #faf9fc;
+  --borda: #e4e1ea;
+  --texto: #201b2b;
+  --texto-fraco: #6b6577;
+  --acento: var(--marca-indigo);
+  --acento-suave: #eeebf5;
   --ok: #1a8f5f;
   --ok-suave: #e6f5ee;
-  --alerta: #b7791f;
-  --alerta-suave: #fdf3e0;
+  --alerta: #b45c17;
+  --alerta-suave: #fdf0e4;
   --critico: #c33b3b;
   --critico-suave: #fdecec;
-  --acao: #6b3fd4;
-  --acao-suave: #f0eaff;
-  --sombra: 0 1px 2px rgba(20, 25, 40, .06), 0 6px 20px rgba(20, 25, 40, .05);
+  --acao: var(--marca-indigo);
+  --acao-suave: #eeebf5;
+  --sombra: 0 1px 2px rgba(32, 27, 43, .06), 0 6px 20px rgba(32, 27, 43, .05);
   --raio: 12px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --fundo: #12141a;
-    --superficie: #1a1d26;
-    --superficie-2: #21242f;
-    --borda: #2e3341;
-    --texto: #e9ebf2;
-    --texto-fraco: #9aa1b3;
-    --acento: #7b9bff;
-    --acento-suave: #1e2740;
+    /* no escuro o indigo da logo fica ilegivel e o laranja fica pesado:
+       ambos sobem de luminosidade mantendo o matiz da marca */
+    --marca-laranja: #f2924f;
+    --marca-indigo: #a192cf;
+
+    --fundo: #15121b;
+    --superficie: #1e1a26;
+    --superficie-2: #262130;
+    --borda: #353045;
+    --texto: #ece9f2;
+    --texto-fraco: #a29aae;
+    --acento: var(--marca-indigo);
+    --acento-suave: #2a2338;
     --ok: #4ecf95;
     --ok-suave: #14281f;
-    --alerta: #e8b355;
-    --alerta-suave: #2c2415;
+    --alerta: var(--marca-laranja);
+    --alerta-suave: #2e2013;
     --critico: #f07a7a;
     --critico-suave: #2e1919;
-    --acao: #a888ff;
-    --acao-suave: #241d3a;
+    --acao: var(--marca-indigo);
+    --acao-suave: #2a2338;
     --sombra: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .25);
   }
 }
@@ -71,15 +91,26 @@ p { margin: 0 0 .6em; }
   height: 100vh;
 }
 
-.marca { display: flex; gap: 11px; align-items: center; }
-.marca-icone {
-  width: 38px; height: 38px; border-radius: 10px;
-  background: var(--acento); color: #fff;
-  display: grid; place-items: center;
-  font-weight: 700; font-size: 13px; letter-spacing: .5px;
+/* Marca ECOART reproduzida em texto — a logo original nao tem simbolo, e so
+   "eco" laranja + "art" indigo + "SOLUÇÕES" cinza espacado. Fonte arredondada
+   quando o sistema tiver uma; senao cai no padrao, que fica proximo. */
+.marca { display: flex; flex-direction: column; gap: 3px; }
+.marca-logo {
+  font-family: "SF Pro Rounded", "Nunito", "Varela Round", system-ui, sans-serif;
+  font-size: 27px; font-weight: 700; line-height: 1; letter-spacing: -.02em;
 }
-.marca strong { display: block; font-size: 15px; }
-.marca small { color: var(--texto-fraco); font-size: 12px; }
+.marca-logo .eco { color: var(--marca-laranja); }
+.marca-logo .art { color: var(--marca-indigo); }
+.marca-logo .solucoes {
+  display: block; margin-top: 3px;
+  color: var(--marca-cinza); font-size: 8.5px; font-weight: 600;
+  letter-spacing: .44em; text-indent: .44em;
+}
+.marca-sistema {
+  margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--borda);
+}
+.marca-sistema strong { display: block; font-size: 14px; }
+.marca-sistema small { display: block; color: var(--texto-fraco); font-size: 12px; }
 
 .menu { display: flex; flex-direction: column; gap: 2px; }
 .menu a {

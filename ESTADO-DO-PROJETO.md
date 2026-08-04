@@ -262,11 +262,27 @@ cadastrado como responsável técnico** porque o documento não diz que ele é.
    banco e PDFs sem aviso. Passo a passo no `DEPLOY.md`.
 6. **Fechar o repositório** (tornar privado) quando o sistema estiver pronto.
 
-### Trabalho iniciado e interrompido
+### Identidade visual — feita
 
-- **Identidade visual da ECOART** (logo e cores no sistema). Foi interrompido antes de qualquer
-  alteração — **nenhum arquivo foi modificado**. Ver seção 10 sobre o que falta para fazer isso
-  direito.
+As cores da ECOART foram amostradas em pixel na logo e aplicadas ao sistema:
+
+| Cor | Hex | Onde entra na interface |
+| --- | --- | --- |
+| Laranja | `#E5762D` | Alertas e ações — substituiu o âmbar genérico |
+| Índigo | `#40316A` | Acento principal: links, botões, item ativo do menu |
+| Cinza | `#A6A6A6` | Texto secundário e bordas |
+
+Estão em `public/css/app.css` como `--marca-laranja`, `--marca-indigo` e `--marca-cinza`, no topo
+do arquivo. Trocar a marca inteira é mexer nessas três linhas.
+
+Para texto e bordas o laranja usa um tom escurecido (`#B45C17` no claro): o laranja puro sobre
+fundo claro não alcança contraste de leitura. No modo escuro, laranja e índigo sobem de
+luminosidade mantendo o matiz, senão o índigo fica ilegível.
+
+A logo não tem símbolo — é só "eco" laranja + "art" índigo + "SOLUÇÕES" cinza espaçado. Por isso
+foi reproduzida em texto na barra lateral, sem depender de arquivo de imagem. O favicon usa as duas
+cores da marca. **Se um dia aparecer o arquivo vetorial** (`.ai`/`.eps`/`.svg`/`.cdr`), vale
+reamostrar as cores e trocar a marca em texto pelo SVG real.
 
 ### Ideias levantadas, ainda não decididas
 
