@@ -1,0 +1,124 @@
+/* Tela de entrada.
+   Herda as cores e os controles do app.css — o que existe aqui e so o que a
+   pagina de login tem de proprio. Sobria de proposito: e a porta de um sistema
+   que guarda contrato de terceiro, nao uma pagina de propaganda. */
+
+.tela-entrada {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  /* clarao suave nas duas cores da marca, quase imperceptivel */
+  background:
+    radial-gradient(760px 420px at 15% 8%, color-mix(in srgb, var(--marca-indigo) 11%, transparent), transparent 70%),
+    radial-gradient(620px 380px at 88% 92%, color-mix(in srgb, var(--marca-laranja) 10%, transparent), transparent 70%),
+    var(--fundo);
+}
+
+.entrada { width: 100%; max-width: 520px; }
+
+.entrada-cartao {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: 20px;
+  box-shadow: var(--sombra-alta);
+  padding: 36px 34px 28px;
+  animation: entrada-surgir 460ms cubic-bezier(.22, 1, .36, 1) both;
+}
+
+@keyframes entrada-surgir {
+  from { opacity: 0; transform: translateY(14px) scale(.985); }
+}
+
+/* --------------------------------------------------------------- marca */
+
+/* A marca fica FORA do cartao e bem grande: e a porta de entrada, e assim
+   sobra area para passar o mouse por cima das particulas. */
+.entrada-marca {
+  display: flex; justify-content: center; align-items: center;
+  margin-bottom: 26px;
+}
+.entrada-marca .marca-logo { font-size: 76px; }
+.entrada-marca .marca-logo .solucoes { font-size: 20px; margin-top: 9px; }
+
+.entrada-titulo { text-align: center; margin-bottom: 26px; }
+.entrada-titulo h1 { font-size: 19px; font-weight: 650; }
+.entrada-titulo p { margin: 5px 0 0; font-size: 13px; color: var(--texto-fraco); }
+
+/* ---------------------------------------------------------------- form */
+
+.entrada-form .campo { margin-bottom: 16px; }
+.entrada-form .campo input { padding: 11px 13px; font-size: 15px; }
+.entrada-form .botao { margin-top: 8px; padding: 12px 16px; font-size: 14.5px; }
+
+/* mensagem de erro devolvida pelo servidor */
+.entrada-erro {
+  display: flex; align-items: flex-start; gap: 9px;
+  background: var(--critico-suave);
+  border: 1px solid color-mix(in srgb, var(--critico) 32%, transparent);
+  border-left-width: 3px;
+  border-radius: var(--raio-p);
+  padding: 10px 13px; margin-bottom: 18px;
+  color: var(--critico); font-size: 13px; line-height: 1.45;
+  animation: entrada-tremer 320ms cubic-bezier(.36, .07, .19, .97) both;
+}
+.entrada-erro::before { content: '!'; font-weight: 700; line-height: 1.45; }
+
+/* balanco curto e discreto: chama a atencao sem parecer alarme */
+@keyframes entrada-tremer {
+  10%, 90% { transform: translateX(-1.5px); }
+  20%, 80% { transform: translateX(3px); }
+  30%, 50%, 70% { transform: translateX(-5px); }
+  40%, 60% { transform: translateX(5px); }
+}
+
+.entrada-rodape {
+  margin: 22px 0 0; padding-top: 18px;
+  border-top: 1px solid var(--borda);
+  text-align: center; font-size: 11.5px; color: var(--texto-fraco);
+}
+
+.entrada-aviso {
+  margin: 18px 4px 0; text-align: center;
+  font-size: 11.5px; line-height: 1.5; color: var(--texto-fraco);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entrada-cartao, .entrada-erro { animation: none; }
+}
+
+@media (max-width: 460px) {
+  .tela-entrada { padding: 18px; align-items: start; padding-top: 8vh; }
+  .entrada-cartao { padding: 30px 24px 24px; border-radius: 16px; }
+}
+
+/* ------------------------------------------------- marca em particulas */
+
+/* A area tem altura fixa para o canvas ter onde existir. Enquanto o script
+   nao assume, o que aparece e a marca em texto — se ele nunca assumir, ela
+   fica, e ninguem ve buraco. */
+.entrada-marca[data-marca-particulas] {
+  position: relative;
+  height: 190px;
+  /* o cursor so vira "mao" sobre a marca para dar a dica de que ela reage */
+  cursor: crosshair;
+}
+.entrada-marca .marca-canvas {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+  touch-action: none;
+}
+/* so esconde o texto depois que o canvas assumiu de fato; continua no fluxo
+   para o leitor de tela anunciar "ECOART Soluções" */
+.entrada-marca.com-particulas .marca-logo {
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (max-width: 560px) {
+  .entrada-marca .marca-logo { font-size: 52px; }
+  .entrada-marca .marca-logo .solucoes { font-size: 14px; }
+  .entrada-marca[data-marca-particulas] { height: 136px; }
+}
