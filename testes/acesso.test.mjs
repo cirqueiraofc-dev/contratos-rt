@@ -13,6 +13,7 @@ process.env.DATA_DIR = path.join(base, 'data');
 process.env.UPLOAD_DIR = path.join(base, 'uploads');
 
 const { criarAplicacao } = await import('../src/aplicacao.js');
+const { fecharBanco } = await import('../src/db.js');
 
 // dois-pontos e acento de proposito: sao os casos que quebram uma leitura
 // ingenua do cabecalho Basic, e senha de gente de verdade tem disso
@@ -28,7 +29,9 @@ before(async () => {
 
 after(async () => {
   await new Promise((resolve) => servidor.close(resolve));
-  fs.rmSync(base, { recursive: true, force: true });
+  // o banco precisa fechar antes: no Windows arquivo aberto nao se apaga
+  fecharBanco();
+  fs.rmSync(base, { recursive: true, force: true, maxRetries: 5, retryDelay: 60 });
 });
 
 const comSenha = (senha) => ({

@@ -16,6 +16,7 @@ process.env.UPLOAD_DIR = path.join(base, 'uploads');
 
 const { criarAplicacao } = await import('../src/aplicacao.js');
 const { extrairTexto } = await import('../src/extract/pdfTexto.js');
+const { fecharBanco } = await import('../src/db.js');
 const { datasExemplo, pdfAditivo, pdfArt, pdfContrato } = await import('./amostras.mjs');
 
 const datas = datasExemplo();
@@ -31,7 +32,9 @@ before(async () => {
 
 after(async () => {
   await new Promise((resolve) => servidor.close(resolve));
-  fs.rmSync(base, { recursive: true, force: true });
+  // o banco precisa fechar antes: no Windows arquivo aberto nao se apaga
+  fecharBanco();
+  fs.rmSync(base, { recursive: true, force: true, maxRetries: 5, retryDelay: 60 });
 });
 
 async function json(caminho, opcoes = {}) {

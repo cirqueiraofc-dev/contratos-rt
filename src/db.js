@@ -172,6 +172,28 @@ export function all(sql, ...params) {
   return db.prepare(sql).all(...params);
 }
 
+/**
+ * Fecha o banco e solta o arquivo.
+ *
+ * Existe por causa dos testes: cada teste cria uma pasta temporaria, sobe o
+ * servidor e apaga a pasta no fim. No Windows o arquivo aberto nao pode ser
+ * apagado, entao sem fechar o banco a limpeza falha. Em producao o processo
+ * simplesmente termina e o sistema operacional fecha tudo, mas fechar de
+ * proposito tambem garante que o WAL seja incorporado ao arquivo principal.
+ */
+export function fecharBanco() {
+  try {
+    db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+  } catch {
+    // banco ja pode estar fechado; nao ha o que salvar
+  }
+  try {
+    db.close();
+  } catch {
+    // idem — fechar duas vezes nao e erro que interesse a ninguem
+  }
+}
+
 export function registrarEvento(contratoId, tipo, descricao = '') {
   run(
     `INSERT INTO eventos (contrato_id, tipo, descricao, criado_em) VALUES (?, ?, ?, ?)`,
