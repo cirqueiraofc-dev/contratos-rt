@@ -283,8 +283,11 @@ a.sub:hover { color: var(--acento); }
 .ponto.neutro { background: var(--texto-fraco); }
 
 .contrato-linha {
+  position: relative;
   display: grid; grid-template-columns: 1fr auto; gap: 7px 16px;
-  padding: 16px 18px; border: 1px solid var(--borda); border-radius: var(--raio);
+  /* a folga na direita e o lugar da seta */
+  padding: 16px 44px 16px 18px;
+  border: 1px solid var(--borda); border-radius: var(--raio);
   background: var(--superficie); box-shadow: var(--sombra); cursor: pointer;
   transition: border-color var(--transicao), box-shadow var(--transicao), transform var(--transicao);
 }
@@ -292,6 +295,41 @@ a.sub:hover { color: var(--acento); }
   border-color: var(--acento); box-shadow: var(--sombra-alta); transform: translateY(-1px);
 }
 .contrato-linha:active { transform: translateY(0); }
+
+/* Seta de "abre aqui".
+   A linha inteira e clicavel, mas nada na tela dizia isso — so dava para
+   descobrir passando o mouse. A ponta fica sempre visivel, discreta; quando o
+   mouse chega, ela anda um pouco para a direita e a haste cresce por tras,
+   virando uma seta inteira. Sao dois pseudo-elementos, sem imagem e sem script. */
+.contrato-linha::before,
+.contrato-linha::after {
+  content: ''; position: absolute; top: 50%; pointer-events: none;
+}
+/* haste: nasce com largura zero, encostada na ponta, e se estica para tras */
+.contrato-linha::before {
+  right: 24px; width: 13px; height: 2px; margin-top: -1px;
+  border-radius: 1px; background: var(--acento);
+  transform: scaleX(0); transform-origin: right center;
+  transition: transform 300ms cubic-bezier(.22, 1, .36, 1);
+}
+/* ponta: um quadrado com dois lados, girado 45 graus */
+.contrato-linha::after {
+  right: 21px; width: 8px; height: 8px; margin-top: -4px;
+  border-top: 2px solid var(--texto-fraco);
+  border-right: 2px solid var(--texto-fraco);
+  transform: rotate(45deg);
+  transition: transform 400ms cubic-bezier(.22, 1, .36, 1), border-color var(--transicao);
+}
+.contrato-linha:hover::after, .contrato-linha:focus-visible::after {
+  border-color: var(--acento);
+  transform: translateX(3px) rotate(45deg);
+}
+.contrato-linha:hover::before, .contrato-linha:focus-visible::before {
+  transform: scaleX(1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .contrato-linha::before, .contrato-linha::after { transition: none; }
+}
 .contrato-linha .titulo { font-weight: 650; font-size: 15px; }
 .contrato-linha .sub { color: var(--texto-fraco); font-size: 13px; }
 .contrato-linha .objeto {
@@ -528,7 +566,7 @@ a.sub:hover { color: var(--acento); }
     gap: 12px;
     align-items: start;
   }
-  .contrato-linha { padding: 18px 20px; }
+  .contrato-linha { padding: 18px 48px 18px 20px; }
   .contrato-linha .titulo { font-size: 16px; }
 
   /* campo de busca de 1500px nao ajuda ninguem: para no tamanho de uma frase */
