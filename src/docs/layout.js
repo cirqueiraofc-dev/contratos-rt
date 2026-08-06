@@ -167,7 +167,8 @@ export class Documento {
     linhas.forEach((linha, i) => {
       if (i > 0) this.reservar(alturaLinha);
       this.pagina.drawText(linha, {
-        x: i === 0 ? MARGEM.esq + larguraRotulo : MARGEM.esq + larguraRotulo,
+        // continuacao alinha sob o valor, nao sob o rotulo
+        x: MARGEM.esq + larguraRotulo,
         y: this.y - tamanho,
         size: tamanho,
         font: this.normal,

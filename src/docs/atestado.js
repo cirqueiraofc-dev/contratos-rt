@@ -17,6 +17,22 @@ function periodoTexto(contrato) {
   return ini || fim || '—';
 }
 
+/**
+ * Periodo de uma ART na tabela de responsaveis.
+ *
+ * Muita ART so tem a data de validade cadastrada. Imprimir "14/06/2027" sozinho
+ * numa coluna chamada "Periodo" faz parecer que o servico durou um dia; "ate
+ * 14/06/2027" diz o que se sabe sem afirmar o que nao se sabe.
+ */
+function periodoArt(rt) {
+  const ini = formatarData(rt.data_inicio);
+  const fim = formatarData(rt.data_validade);
+  if (ini && fim) return `${ini} a ${fim}`;
+  if (fim) return `até ${fim}`;
+  if (ini) return `a partir de ${ini}`;
+  return '—';
+}
+
 function prazoTexto(contrato) {
   if (!contrato.vigencia_meses) return '';
   const n = Number(contrato.vigencia_meses);
@@ -129,18 +145,23 @@ export async function gerarAtestado({ contrato, rts, empresa, aditivos = [] }) {
   if (emitidas.length) {
     doc.tabela({
       colunas: [
-        { titulo: 'Modalidade', largura: 17 },
-        { titulo: 'Profissional', largura: 27 },
-        { titulo: 'Registro / CREA', largura: 20 },
-        { titulo: 'Nº da ART', largura: 20 },
-        { titulo: 'Período', largura: 16 },
+        // As larguras seguem o conteudo, nao o titulo da coluna. Duas nao
+        // podem quebrar de jeito nenhum: o numero da ART, porque alguem vai
+        // transcrever isso num protocolo do CREA, e o periodo, para as duas
+        // datas ficarem na mesma linha. Nome de profissional pode quebrar sem
+        // prejuizo, entao e dele que sai o espaco.
+        { titulo: 'Modalidade', largura: 14 },
+        { titulo: 'Profissional', largura: 20 },
+        { titulo: 'Registro / CREA', largura: 22 },
+        { titulo: 'Nº da ART', largura: 19 },
+        { titulo: 'Período', largura: 25 },
       ],
       linhas: emitidas.map((rt) => [
         DISCIPLINAS[rt.disciplina]?.nome ?? rt.disciplina,
         rt.profissional || '—',
         [rt.crea, rt.rnp ? `RNP ${rt.rnp}` : ''].filter(Boolean).join(' · ') || '—',
         rt.numero_art || '—',
-        [formatarData(rt.data_inicio), formatarData(rt.data_validade)].filter(Boolean).join(' a ') || '—',
+        periodoArt(rt),
       ]),
     });
   } else {
@@ -156,17 +177,9 @@ export async function gerarAtestado({ contrato, rts, empresa, aditivos = [] }) {
   doc.paragrafo('Conceito atribuído à execução:');
   doc.checklist(['Ótimo', 'Bom', 'Regular', 'Insatisfatório']);
 
-  doc.espaco(10);
-  doc.escrever(
-    `${cidadeUf || '____________________'}, ${dataPorExtenso(hojeISO())}.`,
-    { alinhamento: 'direita' },
-  );
-
-  doc.assinatura({
-    nome: '[NOME DO REPRESENTANTE LEGAL DO CONTRATANTE]',
-    linhas: ['Cargo / Matrícula', contrato.contratante || '[ÓRGÃO CONTRATANTE]'],
-  });
-
+  // A nota vem ANTES da assinatura de proposito. Texto abaixo de uma linha de
+  // assinatura da a entender que foi acrescentado depois de assinado, e este e
+  // um documento que vai ao CREA.
   doc.nota(
     'Documento gerado automaticamente como modelo a partir dos dados cadastrados no sistema. '
     + 'Antes do envio, confira todos os campos entre colchetes, complete a descrição dos serviços e os quantitativos executados '
@@ -174,6 +187,21 @@ export async function gerarAtestado({ contrato, rts, empresa, aditivos = [] }) {
     + 'o atestado deve identificar o contratante e a contratada, o contrato, o período de execução, a descrição dos serviços '
     + 'e os profissionais responsáveis com as respectivas ARTs.',
   );
+
+  doc.espaco(10);
+  // Quem assina o atestado e o CONTRATANTE, entao o local e a cidade dele — nao
+  // a da ECOART. O sistema nao guarda a cidade do contratante, e uma prefeitura
+  // de Ribeirao Preto assinando "Manaus/AM" seria um erro grave num documento
+  // que instrui processo no CREA. Fica como campo a preencher, igual aos outros.
+  doc.escrever(
+    `[CIDADE]/[UF], ${dataPorExtenso(hojeISO())}.`,
+    { alinhamento: 'direita' },
+  );
+
+  doc.assinatura({
+    nome: '[NOME DO REPRESENTANTE LEGAL DO CONTRATANTE]',
+    linhas: ['Cargo / Matrícula', contrato.contratante || '[ÓRGÃO CONTRATANTE]'],
+  });
 
   return doc.finalizar();
 }
