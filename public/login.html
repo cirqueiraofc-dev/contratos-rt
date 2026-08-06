@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Entrar · Contratos e RT</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%2340316a'/><text x='32' y='45' font-size='42' font-weight='700' font-family='system-ui,sans-serif' fill='%23e5762d' text-anchor='middle'>e</text></svg>" />
+<meta name="theme-color" content="#40316a" />
+<link rel="stylesheet" href="/css/app.css" />
+<link rel="stylesheet" href="/css/login.css" />
+</head>
+<body class="tela-entrada">
+
+  <main class="entrada">
+    <div class="entrada-marca" data-marca-particulas>
+      <span class="marca-logo" role="img" aria-label="ECOART Soluções">
+        <span class="eco">eco</span><span class="art">art</span>
+        <span class="solucoes" aria-hidden="true">SOLUÇÕES</span>
+      </span>
+    </div>
+
+    <div class="entrada-cartao">
+
+      <div class="entrada-titulo">
+        <h1>Contratos e RT</h1>
+        <p>Gestão de contratos e responsabilidades técnicas</p>
+      </div>
+
+      <form class="entrada-form" method="post" action="/entrar">
+        <div class="campo">
+          <label for="usuario">Usuário</label>
+          <input id="usuario" name="usuario" type="text" autocomplete="username"
+                 autocapitalize="none" spellcheck="false" required />
+        </div>
+
+        <div class="campo">
+          <label for="senha">Senha</label>
+          <input id="senha" name="senha" type="password" autocomplete="current-password" required />
+        </div>
+
+        <button class="botao primario largo" type="submit">Entrar</button>
+      </form>
+
+      <p class="entrada-rodape">
+        Acesso restrito · ECOART Soluções Ltda
+      </p>
+    </div>
+
+    <p class="entrada-aviso">
+      Os contratos guardados aqui pertencem a terceiros. Não compartilhe seu acesso.
+    </p>
+  </main>
+
+  <script src="/js/marca-particulas.js"></script>
+</body>
+</html>
