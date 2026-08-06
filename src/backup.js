@@ -162,6 +162,10 @@ export function gerarBackup() {
     const caminho = path.join(UPLOAD_DIR, nome);
     // _tmp e pasta de trabalho: nao entra, e o statSync tambem filtra
     if (!fs.statSync(caminho).isFile()) continue;
+    // .gitkeep e afins sao arrumacao do repositorio, nao dado da cliente. Sem
+    // isso o backup os carrega e a restauracao os recusa, relatando "1
+    // descartado" — o que faz parecer que algo se perdeu.
+    if (nome.startsWith('.')) continue;
     const conteudo = fs.readFileSync(caminho);
     bytes += conteudo.length;
     if (bytes > LIMITE) {

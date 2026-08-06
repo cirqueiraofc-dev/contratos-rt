@@ -279,3 +279,15 @@ test('o sistema segue de pé depois de tudo isso', async () => {
   await enviarParaRestaurar(estado.copia);
   assert.equal((await (await fetch(`${url}/api/contratos`)).json()).length, 1);
 });
+
+test('arquivo de arrumação do repositório não entra na cópia', async () => {
+  fs.writeFileSync(path.join(process.env.UPLOAD_DIR, '.gitkeep'), '');
+
+  const zip = Buffer.from(await (await fetch(`${url}/api/backup`)).arrayBuffer());
+  const dentro = [...abrirZip(zip).keys()];
+  assert.equal(dentro.includes('uploads/.gitkeep'), false, '.gitkeep não deve ir junto');
+
+  // e, por consequência, a restauração não relata nada descartado
+  const { corpo } = await enviarParaRestaurar(zip);
+  assert.equal(corpo.descartados, 0);
+});
