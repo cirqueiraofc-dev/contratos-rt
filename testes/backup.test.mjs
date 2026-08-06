@@ -161,3 +161,121 @@ test('a cópia sai consistente mesmo com o banco em uso', async () => {
     banco.close();
   }
 });
+
+/* ----------------------------------------------------------- restauracao */
+
+const { montarZip } = await import('../src/backup.js');
+
+async function enviarParaRestaurar(zip, nome = 'copia.zip') {
+  const forma = new FormData();
+  forma.append('arquivo', new Blob([zip], { type: 'application/zip' }), nome);
+  const resposta = await fetch(`${url}/api/restaurar`, { method: 'POST', body: forma });
+  return { resposta, corpo: await resposta.json() };
+}
+
+test('guarda uma cópia e depois destrói tudo, para ter o que restaurar', async () => {
+  estado.copia = Buffer.from(await (await fetch(`${url}/api/backup`)).arrayBuffer());
+
+  const apagado = await fetch(`${url}/api/contratos/${estado.contrato.id}`, { method: 'DELETE' });
+  assert.equal(apagado.status, 204);
+
+  const painel = await (await fetch(`${url}/api/painel`)).json();
+  assert.equal(painel.indicadores.contratos_ativos, 0);
+  assert.deepEqual(fs.readdirSync(process.env.UPLOAD_DIR).filter((n) => n.endsWith('.pdf')), []);
+});
+
+test('restaurar devolve os contratos, as RTs e os PDFs', async () => {
+  const { resposta, corpo } = await enviarParaRestaurar(estado.copia);
+  assert.equal(resposta.status, 200, JSON.stringify(corpo));
+  assert.equal(corpo.contratos, 1);
+  assert.equal(corpo.pdfs, 1);
+  assert.equal(corpo.descartados, 0);
+
+  const lista = await (await fetch(`${url}/api/contratos`)).json();
+  assert.equal(lista.length, 1);
+  assert.equal(lista[0].numero, estado.contrato.numero);
+
+  const contrato = await (await fetch(`${url}/api/contratos/${lista[0].id}`)).json();
+  assert.equal(contrato.rts.length, 1);
+  assert.equal(contrato.rts[0].disciplina, 'eletrica');
+
+  // o PDF nao pode voltar so como linha no banco: o arquivo tem que existir
+  const pdf = await fetch(`${url}/api/contratos/${contrato.id}/arquivo`);
+  assert.equal(pdf.status, 200);
+  assert.equal(Buffer.from(await pdf.arrayBuffer()).subarray(0, 4).toString(), '%PDF');
+});
+
+test('restaurar duas vezes seguidas não duplica nada', async () => {
+  await enviarParaRestaurar(estado.copia);
+  const { corpo } = await enviarParaRestaurar(estado.copia);
+  assert.equal(corpo.contratos, 1);
+  assert.equal((await (await fetch(`${url}/api/contratos`)).json()).length, 1);
+  assert.equal(fs.readdirSync(process.env.UPLOAD_DIR).filter((n) => n.endsWith('.pdf')).length, 1);
+});
+
+test('arquivo que não é cópia deste sistema é recusado sem estragar nada', async () => {
+  const antes = await (await fetch(`${url}/api/contratos`)).json();
+
+  const intruso = montarZip([
+    { nome: 'contratos.db', conteudo: Buffer.from('isto não é um banco de dados') },
+    { nome: 'uploads/qualquer.pdf', conteudo: Buffer.from('%PDF-1.4') },
+  ]);
+  const { resposta, corpo } = await enviarParaRestaurar(intruso);
+  assert.ok(resposta.status >= 400, 'deve recusar');
+  assert.ok(corpo.erro, 'deve explicar o que houve');
+
+  const depois = await (await fetch(`${url}/api/contratos`)).json();
+  assert.deepEqual(depois.map((c) => c.numero), antes.map((c) => c.numero));
+});
+
+test('zip sem o banco dentro é recusado com recado claro', async () => {
+  const semBanco = montarZip([{ nome: 'uploads/solto.pdf', conteudo: Buffer.from('%PDF-1.4') }]);
+  const { corpo } = await enviarParaRestaurar(semBanco);
+  assert.match(corpo.erro, /contratos\.db/);
+});
+
+test('arquivo que não é zip é recusado antes de qualquer coisa', async () => {
+  const forma = new FormData();
+  forma.append('arquivo', new Blob([Buffer.from('%PDF-1.4')], { type: 'application/pdf' }), 'contrato.pdf');
+  const resposta = await fetch(`${url}/api/restaurar`, { method: 'POST', body: forma });
+  assert.equal(resposta.status, 400);
+  assert.match((await resposta.json()).erro, /\.zip/);
+});
+
+test('nome de arquivo com caminho para fora da pasta é descartado', async () => {
+  // um .zip preparado de má fé pode trazer "uploads/../../server.js" dentro;
+  // se o sistema escrevesse onde o nome manda, sobrescreveria a si mesmo
+  const banco = abrirZip(estado.copia).get('contratos.db');
+  const armadilha = montarZip([
+    { nome: 'contratos.db', conteudo: banco },
+    { nome: 'uploads/../../invasao.txt', conteudo: Buffer.from('não deveria existir') },
+    { nome: 'uploads/sub/pasta.pdf', conteudo: Buffer.from('%PDF-1.4') },
+  ]);
+
+  const { resposta, corpo } = await enviarParaRestaurar(armadilha);
+  assert.equal(resposta.status, 200, JSON.stringify(corpo));
+  assert.equal(corpo.descartados, 2, 'os dois caminhos suspeitos devem ser descartados');
+
+  const acima = path.resolve(process.env.UPLOAD_DIR, '..', '..');
+  assert.equal(fs.existsSync(path.join(acima, 'invasao.txt')), false);
+  assert.equal(fs.existsSync(path.join(process.env.UPLOAD_DIR, 'invasao.txt')), false);
+  assert.equal(fs.existsSync(path.join(process.env.UPLOAD_DIR, 'sub')), false);
+});
+
+test('zip corrompido no meio é percebido antes de tocar nos dados', async () => {
+  const antes = await (await fetch(`${url}/api/contratos`)).json();
+  const estragado = Buffer.from(estado.copia);
+  estragado[Math.floor(estragado.length / 2)] ^= 0xff;
+
+  const { resposta, corpo } = await enviarParaRestaurar(estragado);
+  assert.ok(resposta.status >= 400, 'deve recusar');
+  assert.match(corpo.erro, /corrompid|não é um \.zip|compressão|índice/i);
+
+  const depois = await (await fetch(`${url}/api/contratos`)).json();
+  assert.deepEqual(depois.map((c) => c.numero), antes.map((c) => c.numero));
+});
+
+test('o sistema segue de pé depois de tudo isso', async () => {
+  await enviarParaRestaurar(estado.copia);
+  assert.equal((await (await fetch(`${url}/api/contratos`)).json()).length, 1);
+});

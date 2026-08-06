@@ -11,6 +11,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import zlib from 'node:zlib';
 
 import { db } from './db.js';
@@ -181,4 +182,191 @@ export function gerarBackup() {
     arquivos: arquivos.length,
     bytes,
   };
+}
+
+/* ----------------------------------------------------------- restauracao */
+
+/**
+ * Le um .zip pelo diretorio central, que e por onde todo descompactador
+ * comeca. Ler pelo diretorio, e nao varrendo o arquivo do inicio, e o que
+ * garante pegar a versao final de cada entrada.
+ *
+ * @returns {Map<string, Buffer>} caminho dentro do zip -> conteudo
+ */
+export function lerZip(buffer) {
+  const marca = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
+  const fim = buffer.lastIndexOf(marca);
+  if (fim === -1) throw new Error('O arquivo enviado não é um .zip válido.');
+
+  const quantos = buffer.readUInt16LE(fim + 10);
+  let ponteiro = buffer.readUInt32LE(fim + 16);
+  const arquivos = new Map();
+
+  for (let i = 0; i < quantos; i += 1) {
+    if (buffer.readUInt32LE(ponteiro) !== 0x02014b50) {
+      throw new Error('O .zip está corrompido: o índice interno não bate.');
+    }
+    const metodo = buffer.readUInt16LE(ponteiro + 10);
+    const crc = buffer.readUInt32LE(ponteiro + 16);
+    const comprimido = buffer.readUInt32LE(ponteiro + 20);
+    const tamNome = buffer.readUInt16LE(ponteiro + 28);
+    const tamExtra = buffer.readUInt16LE(ponteiro + 30);
+    const tamComentario = buffer.readUInt16LE(ponteiro + 32);
+    const inicio = buffer.readUInt32LE(ponteiro + 42);
+    const nome = buffer.toString('utf8', ponteiro + 46, ponteiro + 46 + tamNome);
+    ponteiro += 46 + tamNome + tamExtra + tamComentario;
+
+    if (nome.endsWith('/')) continue;                       // pasta
+    if (metodo !== 0 && metodo !== 8) {
+      throw new Error(`O arquivo "${nome}" usa uma compressão que não sabemos ler.`);
+    }
+    const dados = inicio + 30 + buffer.readUInt16LE(inicio + 26) + buffer.readUInt16LE(inicio + 28);
+    const bruto = buffer.subarray(dados, dados + comprimido);
+    const conteudo = metodo === 8 ? zlib.inflateRawSync(bruto) : bruto;
+
+    // o CRC e a unica defesa contra um arquivo truncado no meio do caminho
+    if (zlib.crc32(conteudo) !== crc) {
+      throw new Error(`O arquivo "${nome}" veio corrompido dentro do .zip.`);
+    }
+    arquivos.set(nome, conteudo);
+  }
+  return arquivos;
+}
+
+// Ordem importa: pai antes de filho, para as chaves estrangeiras fecharem.
+const TABELAS = ['empresa', 'profissionais', 'contratos', 'aditivos', 'rts', 'documentos', 'eventos'];
+
+/** Nomes das colunas de uma tabela, no banco indicado. */
+function colunas(tabela, prefixo = '') {
+  return db.prepare(`PRAGMA ${prefixo}table_info(${tabela})`).all().map((c) => c.name);
+}
+
+/**
+ * So aceita um nome de arquivo simples dentro de uploads/.
+ * Sem isso, um .zip preparado de ma fe com "../../server.js" dentro
+ * sobrescreveria o proprio sistema ao ser restaurado.
+ */
+function nomeSeguro(caminho) {
+  const nome = caminho.slice('uploads/'.length);
+  if (!nome || nome !== path.basename(nome)) return null;
+  if (nome.startsWith('.') || /[\\/:*?"<>|]/.test(nome)) return null;
+  return nome;
+}
+
+/**
+ * Devolve os dados de um backup para dentro do sistema em funcionamento.
+ *
+ * Nao troca o arquivo do banco — isso exigiria derrubar o servico e daria
+ * problema com o arquivo aberto. Em vez disso, anexa o banco do backup e
+ * copia tabela por tabela dentro de uma unica transacao: ou tudo entra, ou
+ * nada muda. Se algo falhar no meio, o sistema continua como estava.
+ *
+ * @param {Buffer} zip conteudo do arquivo enviado
+ * @returns {{contratos: number, pdfs: number, descartados: number}}
+ */
+export function restaurarBackup(zip) {
+  const arquivos = lerZip(zip);
+  const banco = arquivos.get('contratos.db');
+  if (!banco) {
+    throw new Error('Este .zip não tem o arquivo contratos.db. Envie a cópia de segurança gerada pelo próprio sistema.');
+  }
+
+  fs.mkdirSync(TMP_DIR, { recursive: true });
+  const recebido = path.join(TMP_DIR, `restaurar-${process.pid}-${Date.now()}.db`);
+  fs.writeFileSync(recebido, banco);
+
+  try {
+    // confere que e mesmo um banco deste sistema antes de encostar no atual
+    const vindo = new DatabaseSync(recebido, { readOnly: true });
+    try {
+      const tem = new Set(
+        vindo.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all().map((t) => t.name),
+      );
+      const faltando = TABELAS.filter((t) => !tem.has(t));
+      if (faltando.length) {
+        throw new Error(`O banco enviado não parece ser deste sistema: falta ${faltando.join(', ')}.`);
+      }
+    } finally {
+      vindo.close();
+    }
+
+    return trocarDados(recebido, arquivos);
+  } finally {
+    fs.rmSync(recebido, { force: true });
+  }
+}
+
+/** Troca o conteudo do banco atual pelo do backup, tudo ou nada. */
+function trocarDados(recebido, arquivos) {
+  db.exec(`ATTACH DATABASE '${recebido.replaceAll("'", "''")}' AS copia`);
+  try {
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      // adia a checagem das chaves estrangeiras para o fim da transacao: no
+      // meio da troca as tabelas ficam temporariamente inconsistentes entre si
+      db.exec('PRAGMA defer_foreign_keys = ON');
+
+      for (const tabela of [...TABELAS].reverse()) db.exec(`DELETE FROM ${tabela}`);
+
+      for (const tabela of TABELAS) {
+        // so as colunas que existem nos dois lados: assim um backup antigo,
+        // feito antes de alguma coluna nova, ainda entra
+        const comuns = colunas(tabela).filter((c) => colunas(tabela, 'copia.').includes(c));
+        if (!comuns.length) continue;
+        const lista = comuns.map((c) => `"${c}"`).join(', ');
+        db.exec(`INSERT INTO ${tabela} (${lista}) SELECT ${lista} FROM copia.${tabela}`);
+      }
+      db.exec('COMMIT');
+    } catch (erro) {
+      db.exec('ROLLBACK');
+      throw erro;
+    }
+  } finally {
+    db.exec('DETACH DATABASE copia');
+  }
+
+  const problemas = db.prepare('PRAGMA foreign_key_check').all();
+  if (problemas.length) {
+    throw new Error('Os dados restaurados ficaram inconsistentes. O sistema foi mantido como estava.');
+  }
+
+  return { ...trocarArquivos(arquivos), contratos: contarContratos() };
+}
+
+function contarContratos() {
+  return Number(db.prepare('SELECT COUNT(*) AS n FROM contratos').get().n);
+}
+
+/**
+ * Repoe os PDFs. O que estava na pasta e nao esta no backup e removido: o
+ * banco foi substituido, entao esses arquivos nao pertencem mais a contrato
+ * nenhum e so ocupariam espaco sem que ninguem soubesse de onde vieram.
+ */
+function trocarArquivos(arquivos) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+  const doBackup = new Set();
+  let pdfs = 0;
+  let descartados = 0;
+
+  for (const [caminho, conteudo] of arquivos) {
+    if (!caminho.startsWith('uploads/')) continue;
+    const nome = nomeSeguro(caminho);
+    if (!nome) {
+      descartados += 1;
+      continue;
+    }
+    fs.writeFileSync(path.join(UPLOAD_DIR, nome), conteudo);
+    doBackup.add(nome);
+    pdfs += 1;
+  }
+
+  for (const nome of fs.readdirSync(UPLOAD_DIR)) {
+    if (doBackup.has(nome)) continue;
+    const caminho = path.join(UPLOAD_DIR, nome);
+    if (!fs.statSync(caminho).isFile()) continue;   // preserva _tmp
+    fs.rmSync(caminho, { force: true });
+  }
+
+  return { pdfs, descartados };
 }

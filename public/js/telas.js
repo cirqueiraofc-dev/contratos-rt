@@ -368,6 +368,19 @@ export function telaConfiguracoes(empresa, profissionais, disciplinas) {
         e documentos gerados. Guarde fora do Render: no computador, no Drive, onde preferir.
       </p>
       <button class="botao primario" id="baixar-backup">Baixar cópia de segurança</button>
+
+      <hr style="border:0;border-top:1px solid var(--borda);margin:22px 0 18px" />
+
+      <h3 style="margin:0 0 6px;font-size:14.5px">Restaurar uma cópia</h3>
+      <p>
+        Devolve ao sistema os contratos, ARTs e arquivos de um <code>.zip</code> gerado aqui.
+        <strong>Tudo o que estiver cadastrado agora será apagado</strong> e substituído pelo
+        conteúdo do arquivo. Se houver algo que não está na cópia, baixe uma antes.
+      </p>
+      <div class="filtros" style="margin-top:14px">
+        <input type="file" id="arquivo-restauracao" accept=".zip,application/zip" />
+        <button class="botao perigo" id="restaurar-backup">Restaurar</button>
+      </div>
     </div>
 
     <div class="cartao">

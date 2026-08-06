@@ -51,6 +51,8 @@ export const api = {
     return nome;
   },
 
+  restaurarBackup: (arquivo) => enviarArquivo('/restaurar', arquivo),
+
   profissionais: () => pedir('/profissionais'),
   criarProfissional: (dados) => json('POST')('/profissionais', dados),
   removerProfissional: (id) => pedir(`/profissionais/${id}`, { method: 'DELETE' }),

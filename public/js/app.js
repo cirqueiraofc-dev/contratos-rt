@@ -228,6 +228,39 @@ async function mostrarConfiguracoes() {
     }
   });
 
+  $('#restaurar-backup').addEventListener('click', async (ev) => {
+    const campo = $('#arquivo-restauracao');
+    const arquivo = campo.files?.[0];
+    if (!arquivo) {
+      aviso('Escolha o arquivo .zip da cópia antes de restaurar.', 'erro');
+      return;
+    }
+    // apagar tudo merece mais do que um clique distraido: pede o nome do
+    // arquivo de volta, digitado, para nao ter como acontecer sem querer
+    const confirmacao = prompt(
+      `Restaurar apaga tudo o que está cadastrado agora e coloca o conteúdo de "${arquivo.name}" no lugar.\n\n`
+      + 'Para confirmar, digite: RESTAURAR',
+    );
+    if (confirmacao?.trim().toUpperCase() !== 'RESTAURAR') {
+      aviso('Restauração cancelada. Nada foi alterado.');
+      return;
+    }
+
+    const botao = ev.currentTarget;
+    botao.disabled = true;
+    botao.textContent = 'Restaurando…';
+    try {
+      const r = await api.restaurarBackup(arquivo);
+      aviso(`Restaurado: ${r.contratos} contrato(s) e ${r.pdfs} arquivo(s).`, 'sucesso');
+      campo.value = '';
+      await mostrarConfiguracoes();
+    } catch (erro) {
+      aviso(erro.message, 'erro');
+      botao.disabled = false;
+      botao.textContent = 'Restaurar';
+    }
+  });
+
   $('#form-profissional').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     try {

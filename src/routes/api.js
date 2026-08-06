@@ -3,7 +3,7 @@ import multer from 'multer';
 import fs from 'node:fs';
 
 import { agora, all, get, registrarEvento, run } from '../db.js';
-import { gerarBackup } from '../backup.js';
+import { gerarBackup, restaurarBackup } from '../backup.js';
 import { DISCIPLINAS, IDS_DISCIPLINAS } from '../disciplinas.js';
 import { analisarContrato } from '../extract/contrato.js';
 import { analisarAditivo } from '../extract/aditivo.js';
@@ -28,6 +28,19 @@ const upload = multer({
   fileFilter(_req, file, cb) {
     const ehPdf = file.mimetype === 'application/pdf' || /\.pdf$/i.test(file.originalname);
     cb(ehPdf ? null : new HttpError(400, 'Envie um arquivo PDF.'), ehPdf);
+  },
+});
+
+// A restauracao recebe .zip, nao PDF, e o arquivo pode ser bem maior: 25 MB
+// dao pouco mais de uma duzia de contratos com anexo.
+const uploadBackup = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 200 * 1024 * 1024, files: 1 },
+  fileFilter(_req, file, cb) {
+    const ehZip = file.mimetype === 'application/zip'
+      || file.mimetype === 'application/x-zip-compressed'
+      || /\.zip$/i.test(file.originalname);
+    cb(ehZip ? null : new HttpError(400, 'Envie o arquivo .zip da cópia de segurança.'), ehZip);
   },
 });
 
@@ -597,6 +610,21 @@ api.get('/backup', rota((_req, res) => {
   res.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
   res.setHeader('Content-Length', zip.length);
   res.end(zip);
+}));
+
+/**
+ * Devolve os dados de uma copia para dentro do sistema.
+ *
+ * APAGA tudo o que estiver cadastrado e poe o conteudo do arquivo no lugar —
+ * e por isso que a tela pede confirmacao por escrito antes de chamar aqui.
+ * A troca acontece dentro de uma transacao: se algo der errado no meio, o
+ * sistema fica exatamente como estava.
+ */
+api.post('/restaurar', uploadBackup.single('arquivo'), rota((req, res) => {
+  exigir(req.file, 'Selecione o arquivo .zip da cópia de segurança.');
+  const resultado = restaurarBackup(req.file.buffer);
+  registrarEvento(null, 'backup_restaurado', `${resultado.contratos} contrato(s) e ${resultado.pdfs} arquivo(s).`);
+  res.json(resultado);
 }));
 
 /* ------------------------------------------------------------ utilidades */
