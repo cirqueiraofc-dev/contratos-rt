@@ -185,7 +185,9 @@ p { margin: 0 0 .6em; }
   border-radius: 0 var(--raio-p) var(--raio-p) 0; padding: 10px 12px; margin: 0;
 }
 
-.conteudo { padding: 30px 34px 64px; max-width: 1180px; }
+/* Numa tela de 1920 o conteudo ficava preso a 1180px e sobrava metade da
+   janela vazia. O teto agora e bem maior e as folgas crescem junto. */
+.conteudo { padding: 30px 34px 64px; max-width: 1660px; }
 .carregando { color: var(--texto-fraco); padding: 40px 0; }
 
 .cabecalho-tela { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
@@ -478,8 +480,8 @@ a.sub:hover { color: var(--acento); }
 .aviso-caixa a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
 .vazio {
-  color: var(--texto-fraco); font-size: 13.5px; line-height: 1.55;
-  padding: 26px 20px; text-align: center;
+  color: var(--texto-fraco); font-size: 14px; line-height: 1.6;
+  padding: 46px 28px; text-align: center;
   border: 1px dashed var(--borda-forte); border-radius: var(--raio);
   background: var(--superficie-2);
 }
@@ -495,6 +497,45 @@ a.sub:hover { color: var(--acento); }
 .aviso.erro { border-left-color: var(--critico); }
 .aviso.sucesso { border-left-color: var(--ok); }
 @keyframes entrar { from { opacity: 0; transform: translateY(8px); } }
+
+/* ------------------------------------------------------------ tela larga */
+
+/* Acima de 1500px sobra espaco de verdade: a barra lateral e o texto crescem
+   um pouco e os cartoes respiram, em vez de tudo ficar miudo no canto. */
+@media (min-width: 1500px) {
+  body { font-size: 15.5px; }
+  .app { grid-template-columns: 292px 1fr; }
+  .lateral { padding: 26px 22px; }
+  .conteudo { padding: 38px 46px 80px; }
+  .cabecalho-tela h1 { font-size: 28px; }
+  .cabecalho-tela { margin-bottom: 28px; }
+  .cartao { padding: 24px 26px; }
+  .cartao + .cartao { margin-top: 20px; }
+  .indicadores { gap: 14px; margin-bottom: 24px; }
+  .indicador { padding: 18px 20px 18px 22px; }
+  .indicador b { font-size: 32px; }
+  .indicador span { font-size: 13px; }
+  .tabela { font-size: 14px; }
+  .tabela td { padding: 13px 12px; }
+  .grade-rts { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+
+  /* A lista de contratos era uma fila de tiras compridas com meia tela vazia
+     do lado. Em duas colunas cabe o dobro sem rolar e cada tira fica com uma
+     largura de leitura decente. */
+  .lista:has(> .contrato-linha) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    align-items: start;
+  }
+  .contrato-linha { padding: 18px 20px; }
+  .contrato-linha .titulo { font-size: 16px; }
+
+  /* campo de busca de 1500px nao ajuda ninguem: para no tamanho de uma frase */
+  .filtros input { max-width: 460px; }
+
+  .menu a { padding: 11px 14px; font-size: 14.5px; }
+}
 
 /* --------------------------------------------------------------- mobile */
 

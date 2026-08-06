@@ -16,9 +16,10 @@
     var(--fundo);
 }
 
-.entrada { width: 100%; max-width: 520px; }
+.entrada { width: 100%; max-width: 700px; }
 
 .entrada-cartao {
+  max-width: 430px; margin: 0 auto;
   background: var(--superficie);
   border: 1px solid var(--borda);
   border-radius: 20px;
@@ -39,8 +40,8 @@
   display: flex; justify-content: center; align-items: center;
   margin-bottom: 26px;
 }
-.entrada-marca .marca-logo { font-size: 76px; }
-.entrada-marca .marca-logo .solucoes { font-size: 20px; margin-top: 9px; }
+.entrada-marca .marca-logo { font-size: 116px; }
+.entrada-marca .marca-logo .solucoes { font-size: 36px; margin-top: 14px; }
 
 .entrada-titulo { text-align: center; margin-bottom: 26px; }
 .entrada-titulo h1 { font-size: 19px; font-weight: 650; }
@@ -100,7 +101,7 @@
    fica, e ninguem ve buraco. */
 .entrada-marca[data-marca-particulas] {
   position: relative;
-  height: 190px;
+  height: 272px;
   /* o cursor so vira "mao" sobre a marca para dar a dica de que ela reage */
   cursor: crosshair;
 }
@@ -117,8 +118,13 @@
   pointer-events: none;
 }
 
-@media (max-width: 560px) {
+@media (max-width: 720px) {
+  .entrada-marca .marca-logo { font-size: 74px; }
+  .entrada-marca .marca-logo .solucoes { font-size: 23px; margin-top: 9px; }
+  .entrada-marca[data-marca-particulas] { height: 180px; }
+}
+@media (max-width: 460px) {
   .entrada-marca .marca-logo { font-size: 52px; }
-  .entrada-marca .marca-logo .solucoes { font-size: 14px; }
-  .entrada-marca[data-marca-particulas] { height: 136px; }
+  .entrada-marca .marca-logo .solucoes { font-size: 16px; margin-top: 7px; }
+  .entrada-marca[data-marca-particulas] { height: 132px; }
 }
