@@ -127,6 +127,7 @@ contratos-rt/
 │   ├── disciplinas.js         # as 4 modalidades e os termos que as identificam (com peso)
 │   ├── texto.js               # datas, valores e normalização em português
 │   ├── arquivos.js            # guarda, efetivação e limpeza dos PDFs
+│   ├── backup.js              # cópia de segurança e restauração (escreve e lê ZIP sem dependência)
 │   ├── extract/
 │   │   ├── pdfTexto.js        # extração de texto (pdf.js)
 │   │   ├── contrato.js        # leitura do contrato + detecção das RTs
@@ -173,6 +174,22 @@ O sistema grava o banco SQLite e os PDFs **em arquivo**. Consequências:
 - Migrar para o pago (~US$ 7,25/mês) é renomear `render-producao.yaml` para `render.yaml`, apagar o
   serviço gratuito e recriar o Blueprint. Passo a passo no `DEPLOY.md`.
 
+Enquanto a decisão de plano não é tomada, **Configurações tem cópia de segurança e restauração**
+(`src/backup.js`). Isso não substitui o disco: o backup depende de alguém lembrar de baixar. É a
+diferença entre poder perder trabalho e perder trabalho com certeza.
+
+- **Baixar** gera um `.zip` com `contratos.db` e a pasta `uploads/` inteira. O banco sai por
+  `VACUUM INTO`, que produz uma cópia consistente mesmo com escrita em curso — copiar o arquivo na
+  mão pegaria metade de uma transação, com o resto ainda no WAL.
+- **Restaurar** anexa o banco do backup (`ATTACH`) e copia tabela por tabela dentro de uma única
+  transação, em vez de trocar o arquivo do banco. Assim o serviço não precisa cair, não há arquivo
+  aberto para brigar, e uma falha no meio deixa o sistema exatamente como estava. Só as colunas
+  presentes nos dois lados são copiadas, então um backup antigo ainda entra.
+- O ZIP é escrito e lido à mão, sem dependência: `node:zlib` já traz deflate cru e CRC-32. O CRC de
+  cada entrada é conferido na leitura, e nomes como `uploads/../../server.js` são descartados em
+  vez de gravados — um `.zip` preparado de má fé não sobrescreve o sistema.
+- A tela exige que a palavra `RESTAURAR` seja digitada antes de apagar qualquer coisa.
+
 ### 6.3 Vigência e valor são calculados, não armazenados soltos
 
 O contrato guarda os valores **originais** (`data_vencimento_original`, `valor_original`,
@@ -191,6 +208,26 @@ modalidade é responsabilidade do RT, o sistema apenas sugere e mostra por quê.
 Só a senha vale. Quem acessa pode digitar qualquer coisa no campo de usuário. Foi corrigido um bug
 em que senha contendo `:` nunca funcionaria (o cabeçalho Basic é `usuario:senha`, e o código
 quebrava em todos os `:`). A comparação é feita em tempo constante.
+
+Existe uma tela de entrada pronta em `public/login.html`, com a marca em partículas, mas ela ainda
+é inerte: a rota `/entrar` não existe. Ligá-la significa trocar o Basic por sessão em cookie e
+reescrever `testes/acesso.test.mjs` — mudança que só deve ser publicada com os testes rodados, sob
+pena de trancar a cliente do lado de fora do próprio sistema.
+
+### 6.6 As fontes são hospedadas junto, não vêm de CDN
+
+`public/fontes` guarda a Inter (interface) e a Nunito (marca ECOART), ambas variáveis e com licença
+livre. Servidas com cache de um ano e `immutable`; trocar a fonte significa trocar o nome do
+arquivo. Duas razões para não usar CDN: o sistema continua abrindo se a rede externa cair, e
+nenhum terceiro recebe requisição contando quem abriu um sistema de contratos.
+
+As fontes da Apple (SF Pro, SF Symbols) **não podem ser embutidas** — a licença as restringe a
+desenvolvimento para plataformas Apple. Por isso `--fonte-marca` pede `SF Pro Rounded` primeiro:
+em aparelho da Apple o próprio sistema fornece, o que é permitido; nos demais cai na Nunito.
+
+A marca em partículas do login copia o desenho da fonte para decidir onde cada ponto vai, então ela
+pede a fonte explicitamente antes de desenhar. `document.fonts.ready` sozinho não basta: ele espera
+o que já foi pedido, e com `font-display: swap` a fonte da marca pode nem ter sido requisitada.
 
 ---
 
@@ -259,7 +296,9 @@ cadastrado como responsável técnico** porque o documento não diz que ele é.
 4. **Cadastrar os responsáveis técnicos** da ECOART em Configurações (nome, título, CREA, RNP e as
    modalidades que cada um assina).
 5. **Migrar para o plano pago antes do primeiro contrato real.** No gratuito, um reinício apaga
-   banco e PDFs sem aviso. Passo a passo no `DEPLOY.md`.
+   banco e PDFs sem aviso. Passo a passo no `DEPLOY.md`. Até lá, **baixar a cópia de segurança em
+   Configurações depois de cada cadastro** — é o que existe hoje entre a cliente e a perda dos
+   dados, e depende de alguém lembrar.
 6. **Fechar o repositório** (tornar privado) quando o sistema estiver pronto.
 
 ### Identidade visual — feita
