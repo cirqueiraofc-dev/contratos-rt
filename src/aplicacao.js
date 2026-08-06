@@ -1,4 +1,5 @@
 import crypto from 'node:crypto';
+import path from 'node:path';
 import express from 'express';
 import { api } from './routes/api.js';
 import { limparTemporarios } from './arquivos.js';
@@ -59,6 +60,13 @@ export function criarAplicacao({ senha = '' } = {}) {
 
   app.use(express.json({ limit: '2mb' }));
   app.use('/api', api);
+  // As fontes tem nome fixo e conteudo que nunca muda, entao vale guardar por
+  // muito tempo: sao 390 KB que ninguem precisa baixar duas vezes. Se um dia a
+  // fonte trocar, troca-se o nome do arquivo junto.
+  app.use('/fontes', express.static(path.join(PUBLIC_DIR, 'fontes'), {
+    immutable: true,
+    maxAge: '365d',
+  }));
   app.use(express.static(PUBLIC_DIR, { extensions: ['html'] }));
 
   app.use((req, res) => {

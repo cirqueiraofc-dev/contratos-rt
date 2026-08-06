@@ -86,13 +86,45 @@
   }
 }
 
+/* ---------------------------------------------------------------- fontes */
+
+/* As duas ficam hospedadas junto com o sistema, em public/fontes. Nada de CDN:
+   o sistema continua abrindo se a rede externa cair, e ninguem de fora fica
+   sabendo quem abriu a pagina.
+
+   Sao fontes variaveis — um arquivo so cobre a faixa inteira de peso, em vez
+   de um arquivo por peso. `font-display: swap` faz o texto aparecer na hora
+   com a fonte do sistema e trocar quando a nossa chegar; ninguem espera
+   olhando tela em branco. */
+@font-face {
+  font-family: 'Inter var';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fontes/InterVariable.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Nunito var';
+  font-style: normal;
+  font-weight: 500 800;
+  font-display: swap;
+  src: url('/fontes/Nunito-variavel-latino.woff2') format('woff2');
+}
+
+:root {
+  --fonte: 'Inter var', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* a marca e arredondada; em aparelho da Apple a SF Rounded do proprio
+     sistema ja serve e dispensa baixar qualquer coisa */
+  --fonte-marca: 'SF Pro Rounded', 'Nunito var', system-ui, sans-serif;
+}
+
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
   background: var(--fundo);
   color: var(--texto);
-  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  font: 15px/1.55 var(--fonte);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -170,7 +202,7 @@ p { margin: 0 0 .6em; }
    quando o sistema tiver uma; senao cai no padrao, que fica proximo. */
 .marca { display: flex; flex-direction: column; gap: 3px; }
 .marca-logo {
-  font-family: "SF Pro Rounded", "Nunito", "Varela Round", system-ui, sans-serif;
+  font-family: var(--fonte-marca);
   font-size: 27px; font-weight: 700; line-height: 1; letter-spacing: -.02em;
 }
 .marca-logo .eco { color: var(--marca-laranja); }

@@ -329,9 +329,20 @@ function instalar() {
     }
   };
 
-  // as fontes precisam ter carregado, senao o molde sai com a fonte errada
-  if (document.fonts?.ready) document.fonts.ready.then(montar, montar);
-  else montar();
+  // As fontes precisam ter carregado, senao o molde sai com a fonte errada e a
+  // marca aparece em particulas de outro desenho. `ready` sozinho nao basta:
+  // ele espera o que ja foi pedido, e com font-display: swap a fonte da marca
+  // pode nem ter sido pedida ainda. Entao pedimos explicitamente antes.
+  const fontes = document.fonts;
+  if (fontes) {
+    const estilo = getComputedStyle(marca);
+    Promise.resolve(fontes.load(`${estilo.fontWeight} ${estilo.fontSize} ${estilo.fontFamily}`))
+      .catch(() => {})
+      .then(() => fontes.ready)
+      .then(montar, montar);
+  } else {
+    montar();
+  }
 
   // remonta quando a largura muda de verdade (girar o celular, redimensionar)
   let espera;
