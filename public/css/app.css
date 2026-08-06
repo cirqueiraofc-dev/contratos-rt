@@ -99,6 +99,41 @@ body {
 
 a { color: var(--acento); text-decoration: none; transition: color var(--transicao); }
 a:hover { color: color-mix(in srgb, var(--acento) 75%, var(--texto)); }
+
+/* Link de texto com risco que varre.
+   Sublinhado fixo em tudo polui; sublinhado nenhum esconde que aquilo e
+   clicavel. Aqui o risco existe o tempo todo, so esta encolhido no canto
+   direito — quando o mouse chega, ele entra varrendo pela esquerda. E um
+   pseudo-elemento e uma transicao, sem script e sem imagem.
+   Fica de fora o que ja se anuncia sozinho: botao, item de menu, cartao de
+   contrato (que tem a seta) e aviso (que ja vem sublinhado). */
+a.texto-link,
+.cartao a:not(.botao):not(.etiqueta),
+.lateral-rodape a,
+.cabecalho-tela .sub {
+  position: relative;
+  display: inline-flex; align-items: center;
+}
+a.texto-link::after,
+.cartao a:not(.botao):not(.etiqueta)::after,
+.lateral-rodape a::after,
+.cabecalho-tela .sub::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: -1px;
+  height: 1px; background: currentColor; pointer-events: none;
+  transform: scaleX(0); transform-origin: right center;
+  transition: transform 300ms cubic-bezier(.4, 0, .2, 1);
+}
+a.texto-link:hover::after, a.texto-link:focus-visible::after,
+.cartao a:not(.botao):not(.etiqueta):hover::after,
+.cartao a:not(.botao):not(.etiqueta):focus-visible::after,
+.lateral-rodape a:hover::after, .lateral-rodape a:focus-visible::after,
+.cabecalho-tela .sub:hover::after, .cabecalho-tela .sub:focus-visible::after {
+  transform: scaleX(1); transform-origin: left center;
+}
+@media (prefers-reduced-motion: reduce) {
+  a.texto-link::after, .cartao a:not(.botao):not(.etiqueta)::after,
+  .lateral-rodape a::after, .cabecalho-tela .sub::after { transition: none; }
+}
 h1, h2, h3 { margin: 0; line-height: 1.25; letter-spacing: -.011em; }
 p { margin: 0 0 .6em; }
 
