@@ -28,6 +28,29 @@ export const api = {
   empresa: () => pedir('/empresa'),
   salvarEmpresa: (dados) => json('PUT')('/empresa', dados),
 
+  /**
+   * Baixa o backup. Nao usa `pedir` porque a resposta e binaria, nao JSON;
+   * mas ainda passa pelo fetch para que um erro do servidor apareca como
+   * mensagem na tela em vez de virar um arquivo quebrado na pasta Downloads.
+   */
+  baixarBackup: async () => {
+    const resposta = await fetch('/api/backup');
+    if (!resposta.ok) {
+      const corpo = await resposta.json().catch(() => null);
+      throw new Error(corpo?.erro ?? `Falha ao gerar a cópia (${resposta.status}).`);
+    }
+    const nome = /filename="([^"]+)"/.exec(resposta.headers.get('content-disposition') ?? '')?.[1]
+      ?? 'contratos-rt-backup.zip';
+    const endereco = URL.createObjectURL(await resposta.blob());
+    const link = Object.assign(document.createElement('a'), { href: endereco, download: nome });
+    document.body.append(link);
+    link.click();
+    link.remove();
+    // sem revogar, o navegador segura o arquivo inteiro na memoria
+    setTimeout(() => URL.revokeObjectURL(endereco), 10000);
+    return nome;
+  },
+
   profissionais: () => pedir('/profissionais'),
   criarProfissional: (dados) => json('POST')('/profissionais', dados),
   removerProfissional: (id) => pedir(`/profissionais/${id}`, { method: 'DELETE' }),

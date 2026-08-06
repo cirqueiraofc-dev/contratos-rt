@@ -357,6 +357,20 @@ export function telaConfiguracoes(empresa, profissionais, disciplinas) {
     </div>
 
     <div class="cartao">
+      <div class="cartao-titulo"><h2>Cópia de segurança</h2></div>
+      <div class="aviso-caixa">
+        <strong>Os dados deste sistema não sobrevivem a uma atualização.</strong>
+        A hospedagem atual é a gratuita, que não guarda arquivos entre reinícios.
+        Baixe a cópia sempre que cadastrar contrato novo.
+      </div>
+      <p>
+        O arquivo traz o banco inteiro e todos os PDFs — contratos, ARTs, aditivos
+        e documentos gerados. Guarde fora do Render: no computador, no Drive, onde preferir.
+      </p>
+      <button class="botao primario" id="baixar-backup">Baixar cópia de segurança</button>
+    </div>
+
+    <div class="cartao">
       <div class="cartao-titulo"><h2>Responsáveis técnicos</h2></div>
       ${listaProfissionais}
       <form id="form-profissional" style="margin-top:16px">

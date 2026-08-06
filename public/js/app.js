@@ -210,6 +210,24 @@ async function mostrarConfiguracoes() {
     }
   });
 
+  $('#baixar-backup').addEventListener('click', async (ev) => {
+    const botao = ev.currentTarget;
+    const rotulo = botao.textContent;
+    // juntar os PDFs e comprimir leva alguns segundos com muitos contratos;
+    // sem travar o botao da para pedir tres copias sem querer
+    botao.disabled = true;
+    botao.textContent = 'Preparando a cópia…';
+    try {
+      const nome = await api.baixarBackup();
+      aviso(`Cópia gerada: ${nome}. Guarde fora do Render.`, 'sucesso');
+    } catch (erro) {
+      aviso(erro.message, 'erro');
+    } finally {
+      botao.disabled = false;
+      botao.textContent = rotulo;
+    }
+  });
+
   $('#form-profissional').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     try {

@@ -3,6 +3,7 @@ import multer from 'multer';
 import fs from 'node:fs';
 
 import { agora, all, get, registrarEvento, run } from '../db.js';
+import { gerarBackup } from '../backup.js';
 import { DISCIPLINAS, IDS_DISCIPLINAS } from '../disciplinas.js';
 import { analisarContrato } from '../extract/contrato.js';
 import { analisarAditivo } from '../extract/aditivo.js';
@@ -577,6 +578,25 @@ api.delete('/documentos/:id', rota((req, res) => {
   remover(doc.arquivo);
   run('DELETE FROM documentos WHERE id = ?', doc.id);
   res.status(204).end();
+}));
+
+/* ---------------------------------------------------------------- backup */
+
+/**
+ * Baixa tudo — banco e PDFs — num unico .zip.
+ *
+ * Enquanto a hospedagem for a gratuita, sem disco persistente, este e o unico
+ * jeito de os dados sobreviverem a uma atualizacao do sistema. Nao ha nada de
+ * secreto no arquivo alem dos proprios contratos, e a rota ja esta atras da
+ * senha como todo o resto da API.
+ */
+api.get('/backup', rota((_req, res) => {
+  const { nome, zip } = gerarBackup();
+  res.setHeader('Content-Type', 'application/zip');
+  // o nome vai entre aspas porque tem hifen e dois-pontos
+  res.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
+  res.setHeader('Content-Length', zip.length);
+  res.end(zip);
 }));
 
 /* ------------------------------------------------------------ utilidades */
