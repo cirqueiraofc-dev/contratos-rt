@@ -216,8 +216,18 @@ function animar(canvas, marca) {
   const quadro = (agora) => {
     if (!vivo) return;
 
+    // Em aba de segundo plano o navegador desacelera muito os quadros. Se a
+    // formacao avancasse assim, quem voltasse para a aba encontraria a marca
+    // pela metade. Enquanto a pagina nao esta a vista, a chegada fica parada —
+    // ela comeca quando alguem realmente olha.
+    if (document.hidden && formacao < 1) {
+      ultimo = agora;
+      requestAnimationFrame(quadro);
+      return;
+    }
+
     // avanca a formacao por taxa (nao por linha do tempo), e limita o salto
-    // para uma aba que ficou em segundo plano nao pular a animacao inteira
+    // para um quadro atrasado nao pular a animacao inteira
     const anterior = ultimo ?? agora;
     const dt = Math.min(64, Math.max(0, agora - anterior));
     ultimo = agora;
