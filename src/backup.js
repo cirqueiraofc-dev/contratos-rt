@@ -15,6 +15,7 @@ import { DatabaseSync } from 'node:sqlite';
 import zlib from 'node:zlib';
 
 import { db } from './db.js';
+import { guardarNoAcervo, lerArquivo, ondeGuarda } from './arquivos.js';
 import { TMP_DIR, UPLOAD_DIR } from './paths.js';
 
 // O ZIP classico guarda tamanho em 4 bytes. Passar disso exigiria ZIP64, que
@@ -139,7 +140,25 @@ function leiaMe(quando, quantosPdfs) {
  * Gera o backup completo: banco + PDFs + um LEIA-ME.
  * @returns {{nome: string, zip: Buffer, arquivos: number, bytes: number}}
  */
-export function gerarBackup() {
+/**
+ * Nomes dos PDFs que o sistema realmente usa, tirados do banco.
+ *
+ * Antes isso era um `readdir` da pasta de uploads. Com o acervo no R2 nao ha
+ * pasta para varrer — e, olhando bem, o banco e a fonte melhor de qualquer
+ * forma: ele lista o que pertence a algum contrato, sem arrastar arquivo
+ * orfao nem arrumacao de repositorio junto.
+ */
+function nomesDosArquivos() {
+  const nomes = new Set();
+  for (const tabela of ['contratos', 'aditivos', 'rts', 'documentos']) {
+    for (const linha of db.prepare(`SELECT arquivo FROM ${tabela} WHERE arquivo IS NOT NULL AND arquivo <> ''`).all()) {
+      nomes.add(path.basename(linha.arquivo));
+    }
+  }
+  return [...nomes].sort();
+}
+
+export async function gerarBackup() {
   const quando = new Date();
   const arquivos = [];
 
@@ -158,15 +177,11 @@ export function gerarBackup() {
 
   let bytes = arquivos[0].conteudo.length;
   let pdfs = 0;
-  for (const nome of fs.readdirSync(UPLOAD_DIR).sort()) {
-    const caminho = path.join(UPLOAD_DIR, nome);
-    // _tmp e pasta de trabalho: nao entra, e o statSync tambem filtra
-    if (!fs.statSync(caminho).isFile()) continue;
-    // .gitkeep e afins sao arrumacao do repositorio, nao dado da cliente. Sem
-    // isso o backup os carrega e a restauracao os recusa, relatando "1
-    // descartado" — o que faz parecer que algo se perdeu.
-    if (nome.startsWith('.')) continue;
-    const conteudo = fs.readFileSync(caminho);
+  for (const nome of nomesDosArquivos()) {
+    const conteudo = await lerArquivo(nome);
+    // arquivo citado no banco mas ausente do acervo: o backup segue sem ele em
+    // vez de falhar inteiro — uma copia parcial vale mais que nenhuma
+    if (!conteudo) continue;
     bytes += conteudo.length;
     if (bytes > LIMITE) {
       throw new Error('O backup passou de 2 GB. Fale com quem cuida do sistema antes de continuar.');
@@ -268,7 +283,7 @@ function nomeSeguro(caminho) {
  * @param {Buffer} zip conteudo do arquivo enviado
  * @returns {{contratos: number, pdfs: number, descartados: number}}
  */
-export function restaurarBackup(zip) {
+export async function restaurarBackup(zip) {
   const arquivos = lerZip(zip);
   const banco = arquivos.get('contratos.db');
   if (!banco) {
@@ -294,14 +309,14 @@ export function restaurarBackup(zip) {
       vindo.close();
     }
 
-    return trocarDados(recebido, arquivos);
+    return await trocarDados(recebido, arquivos);
   } finally {
     fs.rmSync(recebido, { force: true });
   }
 }
 
 /** Troca o conteudo do banco atual pelo do backup, tudo ou nada. */
-function trocarDados(recebido, arquivos) {
+async function trocarDados(recebido, arquivos) {
   db.exec(`ATTACH DATABASE '${recebido.replaceAll("'", "''")}' AS copia`);
   try {
     db.exec('BEGIN IMMEDIATE');
@@ -334,7 +349,7 @@ function trocarDados(recebido, arquivos) {
     throw new Error('Os dados restaurados ficaram inconsistentes. O sistema foi mantido como estava.');
   }
 
-  return { ...trocarArquivos(arquivos), contratos: contarContratos() };
+  return { ...(await trocarArquivos(arquivos)), contratos: contarContratos() };
 }
 
 function contarContratos() {
@@ -346,7 +361,7 @@ function contarContratos() {
  * banco foi substituido, entao esses arquivos nao pertencem mais a contrato
  * nenhum e so ocupariam espaco sem que ninguem soubesse de onde vieram.
  */
-function trocarArquivos(arquivos) {
+async function trocarArquivos(arquivos) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
   const doBackup = new Set();
@@ -360,16 +375,22 @@ function trocarArquivos(arquivos) {
       descartados += 1;
       continue;
     }
-    fs.writeFileSync(path.join(UPLOAD_DIR, nome), conteudo);
+    await guardarNoAcervo(nome, conteudo);
     doBackup.add(nome);
     pdfs += 1;
   }
 
-  for (const nome of fs.readdirSync(UPLOAD_DIR)) {
-    if (doBackup.has(nome)) continue;
-    const caminho = path.join(UPLOAD_DIR, nome);
-    if (!fs.statSync(caminho).isFile()) continue;   // preserva _tmp
-    fs.rmSync(caminho, { force: true });
+  // Sobra do acervo anterior: o banco foi substituido, entao esses arquivos
+  // nao pertencem mais a contrato nenhum. So da para varrer quando o acervo e
+  // o disco; no R2 listar exigiria outra operacao, e arquivo orfao la nao
+  // atrapalha nem aparece — fica para a faxina, se um dia fizer falta.
+  if (ondeGuarda() === 'disco') {
+    for (const nome of fs.readdirSync(UPLOAD_DIR)) {
+      if (doBackup.has(nome)) continue;
+      const caminho = path.join(UPLOAD_DIR, nome);
+      if (!fs.statSync(caminho).isFile()) continue;   // preserva _tmp
+      fs.rmSync(caminho, { force: true });
+    }
   }
 
   return { pdfs, descartados };

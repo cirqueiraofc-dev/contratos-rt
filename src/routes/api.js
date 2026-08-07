@@ -12,7 +12,7 @@ import { extrairTexto } from '../extract/pdfTexto.js';
 import { gerarAtestado } from '../docs/atestado.js';
 import { gerarRequerimentoCat } from '../docs/requerimentoCat.js';
 import {
-  caminhoDe, descartarTemporario, efetivar, gravarGerado, guardarTemporario, lerTemporario, remover,
+  descartarTemporario, efetivar, gravarGerado, guardarTemporario, lerArquivo, lerTemporario, remover,
 } from '../arquivos.js';
 import {
   STATUS_CONTRATO, STATUS_RT, lerEmpresa, listarContratos, montarContrato, montarPainel,
@@ -72,15 +72,16 @@ function dataOuNulo(valor) {
   return /^\d{4}-\d{2}-\d{2}$/.test(texto) ? texto : null;
 }
 
-function enviarPdf(res, arquivo, nomeExibido, inline = true) {
-  const caminho = caminhoDe(arquivo);
-  exigir(caminho, 'Arquivo não encontrado.', 404);
+async function enviarPdf(res, arquivo, nomeExibido, inline = true) {
+  const bytes = await lerArquivo(arquivo);
+  exigir(bytes, 'Arquivo não encontrado.', 404);
   res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Length', bytes.length);
   res.setHeader(
     'Content-Disposition',
     `${inline ? 'inline' : 'attachment'}; filename="${(nomeExibido || 'documento.pdf').replace(/"/g, '')}"`,
   );
-  fs.createReadStream(caminho).pipe(res);
+  res.end(bytes);
 }
 
 /* ---------------------------------------------------------------- painel */
@@ -156,7 +157,7 @@ api.post('/contratos/analisar', upload.single('arquivo'), rota(async (req, res) 
   res.json({ token, paginas, extraidos });
 }));
 
-api.post('/contratos', rota((req, res) => {
+api.post('/contratos', rota(async (req, res) => {
   const c = req.body ?? {};
   exigir(textoOuVazio(c.numero), 'Informe o número do contrato.');
 
@@ -170,7 +171,7 @@ api.post('/contratos', rota((req, res) => {
     const tmp = lerTemporario(c.token);
     exigir(tmp, 'O arquivo enviado expirou. Faça o upload novamente.');
     texto = tmp.texto ?? null;
-    const efetivado = efetivar(c.token, 'contrato');
+    const efetivado = await efetivar(c.token, 'contrato');
     arquivo = efetivado?.arquivo ?? null;
     arquivoNome = efetivado?.arquivo_nome ?? null;
   }
@@ -250,7 +251,7 @@ api.put('/contratos/:id', rota((req, res) => {
   res.json(montarContrato(id));
 }));
 
-api.delete('/contratos/:id', rota((req, res) => {
+api.delete('/contratos/:id', rota(async (req, res) => {
   const id = Number(req.params.id);
   const contrato = get('SELECT * FROM contratos WHERE id = ?', id);
   exigir(contrato, 'Contrato não encontrado.', 404);
@@ -260,7 +261,7 @@ api.delete('/contratos/:id', rota((req, res) => {
     ...all('SELECT arquivo FROM aditivos WHERE contrato_id = ?', id).map((a) => a.arquivo),
     ...all('SELECT arquivo FROM documentos WHERE contrato_id = ?', id).map((d) => d.arquivo),
   ]) {
-    if (arquivo) remover(arquivo);
+    if (arquivo) await remover(arquivo);
   }
   run('DELETE FROM contratos WHERE id = ?', id);
   res.status(204).end();
@@ -296,10 +297,10 @@ api.post('/contratos/:id/status', rota((req, res) => {
   res.json(montarContrato(id));
 }));
 
-api.get('/contratos/:id/arquivo', rota((req, res) => {
+api.get('/contratos/:id/arquivo', rota(async (req, res) => {
   const contrato = get('SELECT arquivo, arquivo_nome, numero FROM contratos WHERE id = ?', Number(req.params.id));
   exigir(contrato?.arquivo, 'Este contrato não tem PDF anexado.', 404);
-  enviarPdf(res, contrato.arquivo, contrato.arquivo_nome || `contrato-${contrato.numero}.pdf`);
+  await enviarPdf(res, contrato.arquivo, contrato.arquivo_nome || `contrato-${contrato.numero}.pdf`);
 }));
 
 api.get('/contratos/:id/eventos', rota((req, res) => {
@@ -328,7 +329,7 @@ api.post('/contratos/:id/aditivos/analisar', upload.single('arquivo'), rota(asyn
   res.json({ token, extraidos });
 }));
 
-api.post('/contratos/:id/aditivos', rota((req, res) => {
+api.post('/contratos/:id/aditivos', rota(async (req, res) => {
   const contratoId = Number(req.params.id);
   const contrato = get('SELECT * FROM contratos WHERE id = ?', contratoId);
   exigir(contrato, 'Contrato não encontrado.', 404);
@@ -348,7 +349,7 @@ api.post('/contratos/:id/aditivos', rota((req, res) => {
     const tmp = lerTemporario(c.token);
     exigir(tmp, 'O arquivo enviado expirou. Faça o upload novamente.');
     texto = tmp.texto ?? null;
-    const efetivado = efetivar(c.token, `aditivo-${contrato.numero.replace(/\W+/g, '-')}`);
+    const efetivado = await efetivar(c.token, `aditivo-${contrato.numero.replace(/\W+/g, '-')}`);
     arquivo = efetivado?.arquivo ?? null;
     arquivoNome = efetivado?.arquivo_nome ?? null;
   }
@@ -396,20 +397,20 @@ api.post('/contratos/:id/aditivos', rota((req, res) => {
   res.status(201).json({ ...montarContrato(contratoId), aditivo_id: id });
 }));
 
-api.delete('/aditivos/:id', rota((req, res) => {
+api.delete('/aditivos/:id', rota(async (req, res) => {
   const aditivo = get('SELECT * FROM aditivos WHERE id = ?', Number(req.params.id));
   exigir(aditivo, 'Termo aditivo não encontrado.', 404);
-  if (aditivo.arquivo) remover(aditivo.arquivo);
+  if (aditivo.arquivo) await remover(aditivo.arquivo);
   run('DELETE FROM aditivos WHERE id = ?', aditivo.id);
   recalcularContrato(aditivo.contrato_id);
   registrarEvento(aditivo.contrato_id, 'aditivo_removido', `${aditivo.numero} removido.`);
   res.json(montarContrato(aditivo.contrato_id));
 }));
 
-api.get('/aditivos/:id/arquivo', rota((req, res) => {
+api.get('/aditivos/:id/arquivo', rota(async (req, res) => {
   const aditivo = get('SELECT arquivo, arquivo_nome, numero FROM aditivos WHERE id = ?', Number(req.params.id));
   exigir(aditivo?.arquivo, 'Este termo aditivo não tem PDF anexado.', 404);
-  enviarPdf(res, aditivo.arquivo, aditivo.arquivo_nome || `${aditivo.numero}.pdf`);
+  await enviarPdf(res, aditivo.arquivo, aditivo.arquivo_nome || `${aditivo.numero}.pdf`);
 }));
 
 /* -------------------------------------------------------------------- RTs */
@@ -453,10 +454,10 @@ api.put('/rts/:id', rota((req, res) => {
   res.json(montarContrato(rt.contrato_id));
 }));
 
-api.delete('/rts/:id', rota((req, res) => {
+api.delete('/rts/:id', rota(async (req, res) => {
   const rt = get('SELECT * FROM rts WHERE id = ?', Number(req.params.id));
   exigir(rt, 'RT não encontrada.', 404);
-  if (rt.arquivo) remover(rt.arquivo);
+  if (rt.arquivo) await remover(rt.arquivo);
   run('DELETE FROM rts WHERE id = ?', rt.id);
   res.json(montarContrato(rt.contrato_id));
 }));
@@ -482,7 +483,7 @@ api.post('/rts/:id/analisar-art', upload.single('arquivo'), rota(async (req, res
   res.json({ token, extraidos });
 }));
 
-api.post('/rts/:id/art', rota((req, res) => {
+api.post('/rts/:id/art', rota(async (req, res) => {
   const rt = get('SELECT * FROM rts WHERE id = ?', Number(req.params.id));
   exigir(rt, 'RT não encontrada.', 404);
   const c = req.body ?? {};
@@ -491,9 +492,9 @@ api.post('/rts/:id/art', rota((req, res) => {
   let arquivo = rt.arquivo;
   let arquivoNome = rt.arquivo_nome;
   if (c.token) {
-    const efetivado = efetivar(c.token, `art-${rt.disciplina}`);
+    const efetivado = await efetivar(c.token, `art-${rt.disciplina}`);
     exigir(efetivado, 'O arquivo enviado expirou. Faça o upload novamente.');
-    if (rt.arquivo) remover(rt.arquivo);
+    if (rt.arquivo) await remover(rt.arquivo);
     arquivo = efetivado.arquivo;
     arquivoNome = efetivado.arquivo_nome;
   }
@@ -515,10 +516,10 @@ api.post('/rts/:id/art', rota((req, res) => {
   res.json(montarContrato(rt.contrato_id));
 }));
 
-api.get('/rts/:id/arquivo', rota((req, res) => {
+api.get('/rts/:id/arquivo', rota(async (req, res) => {
   const rt = get('SELECT arquivo, arquivo_nome, numero_art FROM rts WHERE id = ?', Number(req.params.id));
   exigir(rt?.arquivo, 'Esta RT não tem PDF de ART anexado.', 404);
-  enviarPdf(res, rt.arquivo, rt.arquivo_nome || `art-${rt.numero_art}.pdf`);
+  await enviarPdf(res, rt.arquivo, rt.arquivo_nome || `art-${rt.numero_art}.pdf`);
 }));
 
 /* -------------------------------------------------------------- CAT / docs */
@@ -536,7 +537,7 @@ api.post('/contratos/:id/cat', rota(async (req, res) => {
 
   // regerar substitui os documentos anteriores para nao acumular versoes soltas
   for (const antigo of all(`SELECT * FROM documentos WHERE contrato_id = ? AND tipo IN ('atestado', 'requerimento_cat')`, id)) {
-    remover(antigo.arquivo);
+    await remover(antigo.arquivo);
     run('DELETE FROM documentos WHERE id = ?', antigo.id);
   }
 
@@ -550,7 +551,7 @@ api.post('/contratos/:id/cat', rota(async (req, res) => {
   const atestado = await gerarAtestado({
     contrato, rts: comArt.map((rt) => ({ ...rt, status: 'emitida' })), empresa, aditivos,
   });
-  const arquivoAtestado = gravarGerado(atestado, `atestado-${contrato.numero.replace(/\W+/g, '-')}`);
+  const arquivoAtestado = await gravarGerado(atestado, `atestado-${contrato.numero.replace(/\W+/g, '-')}`);
   const nomeAtestado = `Atestado de Capacidade Tecnica - Contrato ${contrato.numero.replace(/\W+/g, '-')}.pdf`;
   const { id: idAtestado } = run(
     `INSERT INTO documentos (contrato_id, tipo, titulo, arquivo, arquivo_nome, dados, criado_em)
@@ -562,7 +563,7 @@ api.post('/contratos/:id/cat', rota(async (req, res) => {
 
   for (const rt of comArt) {
     const bytes = await gerarRequerimentoCat({ contrato, rt, empresa, aditivos });
-    const arquivo = gravarGerado(bytes, `requerimento-cat-${rt.disciplina}`);
+    const arquivo = await gravarGerado(bytes, `requerimento-cat-${rt.disciplina}`);
     const nome = `Requerimento CAT - ${DISCIPLINAS[rt.disciplina].nome} - Contrato ${contrato.numero.replace(/\W+/g, '-')}.pdf`;
     const { id: idDoc } = run(
       `INSERT INTO documentos (contrato_id, tipo, titulo, arquivo, arquivo_nome, dados, criado_em)
@@ -579,16 +580,16 @@ api.post('/contratos/:id/cat', rota(async (req, res) => {
   res.status(201).json(montarContrato(id));
 }));
 
-api.get('/documentos/:id/arquivo', rota((req, res) => {
+api.get('/documentos/:id/arquivo', rota(async (req, res) => {
   const doc = get('SELECT * FROM documentos WHERE id = ?', Number(req.params.id));
   exigir(doc, 'Documento não encontrado.', 404);
-  enviarPdf(res, doc.arquivo, doc.arquivo_nome, req.query.download !== '1');
+  await enviarPdf(res, doc.arquivo, doc.arquivo_nome, req.query.download !== '1');
 }));
 
-api.delete('/documentos/:id', rota((req, res) => {
+api.delete('/documentos/:id', rota(async (req, res) => {
   const doc = get('SELECT * FROM documentos WHERE id = ?', Number(req.params.id));
   exigir(doc, 'Documento não encontrado.', 404);
-  remover(doc.arquivo);
+  await remover(doc.arquivo);
   run('DELETE FROM documentos WHERE id = ?', doc.id);
   res.status(204).end();
 }));
@@ -603,8 +604,8 @@ api.delete('/documentos/:id', rota((req, res) => {
  * secreto no arquivo alem dos proprios contratos, e a rota ja esta atras da
  * senha como todo o resto da API.
  */
-api.get('/backup', rota((_req, res) => {
-  const { nome, zip } = gerarBackup();
+api.get('/backup', rota(async (_req, res) => {
+  const { nome, zip } = await gerarBackup();
   res.setHeader('Content-Type', 'application/zip');
   // o nome vai entre aspas porque tem hifen e dois-pontos
   res.setHeader('Content-Disposition', `attachment; filename="${nome}"`);
@@ -620,9 +621,9 @@ api.get('/backup', rota((_req, res) => {
  * A troca acontece dentro de uma transacao: se algo der errado no meio, o
  * sistema fica exatamente como estava.
  */
-api.post('/restaurar', uploadBackup.single('arquivo'), rota((req, res) => {
+api.post('/restaurar', uploadBackup.single('arquivo'), rota(async (req, res) => {
   exigir(req.file, 'Selecione o arquivo .zip da cópia de segurança.');
-  const resultado = restaurarBackup(req.file.buffer);
+  const resultado = await restaurarBackup(req.file.buffer);
   registrarEvento(null, 'backup_restaurado', `${resultado.contratos} contrato(s) e ${resultado.pdfs} arquivo(s).`);
   res.json(resultado);
 }));
