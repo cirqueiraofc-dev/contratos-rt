@@ -1,71 +1,43 @@
 /* Tela de entrada.
-   Herda as cores e os controles do app.css — o que existe aqui e so o que a
-   pagina de login tem de proprio. Sobria de proposito: e a porta de um sistema
-   que guarda contrato de terceiro, nao uma pagina de propaganda. */
+   Herda cores e controles do app.css — aqui fica so o que esta tela tem de
+   proprio. A arte de fundo e da ECOART: montagem de estrutura, com a marca na
+   roupa de quem trabalha. Ela vem como uma imagem so, sem a marca nem o cartao
+   desenhados dentro, porque esses dois sao elementos de verdade por cima e
+   precisam acompanhar qualquer tamanho de tela. */
 
 .tela-entrada {
   min-height: 100vh;
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 24px;
-  position: relative;
-  isolation: isolate;
-  /* a camada da foto transborda 20px para o desfoque nao clarear nas beiradas;
-     sem isto o transbordo vira barra de rolagem */
-  overflow: hidden;
-  /* o indigo da marca e o piso: se a foto demorar ou falhar, a tela ja esta
-     escura e tudo por cima continua legivel */
-  background: #2c244a;
-  /* nao clarear o texto aqui: a cor desceria para dentro do cartao, que e
-     branco, e sumiria com o titulo. Quem precisa clarear pede por si (abaixo) */
+  padding: 32px 24px;
+  /* o indigo e o piso: enquanto a foto nao chega, e se ela nunca chegar, a
+     tela ja esta escura e tudo por cima continua legivel */
+  background: #2c244a url('/imagens/fundo-entrada.jpg') center / cover no-repeat;
 }
 
-/* Palco montado ao fundo — a ECOART trabalha com eventos, e e disso que a
-   tela fala. Tratada para virar clima e nao assunto: desfocada, meio
-   dessaturada e coberta pelo indigo da marca. Foto nitida atras de um campo de
-   senha atrapalha quem digita; assim ela ambienta sem disputar atencao.
-   O arquivo e o original em 3840x2880, para nao borrar por falta de pixel em
-   monitor grande — o desfoque abaixo e escolha, nao limitacao. Justamente por
-   isso o desfoque pode ser menor: com a foto nitida na origem, os feixes de luz
-   saem lisos em vez de escadinha.
-   Fonte: Unsplash, licenca livre para uso comercial (foto de Elijah Ekdahl).
-   O tratamento e todo em CSS — o arquivo guardado continua sendo o original. */
-.tela-entrada::before {
-  content: '';
-  position: absolute; inset: -20px; z-index: -2;
-  background: url('/imagens/fundo-entrada.jpg') center / cover no-repeat;
-  filter: blur(5px) grayscale(.5);
-  opacity: .46;
-  pointer-events: none;
+.entrada {
+  width: 100%;
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 34px;
 }
 
-/* malha de papel de projeto por cima da foto, bem discreta, apagando no centro
-   onde ficam a marca e o cartao */
-.tela-entrada::after {
-  content: '';
-  position: absolute; inset: 0; z-index: -1;
-  background-image:
-    linear-gradient(to right, rgba(255, 255, 255, .07) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, .07) 1px, transparent 1px);
-  background-size: 46px 46px;
-  -webkit-mask-image: radial-gradient(120% 90% at 50% 45%, transparent 22%, #000 88%);
-  mask-image: radial-gradient(120% 90% at 50% 45%, transparent 22%, #000 88%);
-  pointer-events: none;
+/* a marca fica acima do cartao, com largura propria — maior que ele */
+.entrada-marca {
+  display: block;
+  width: min(430px, 82vw);
+  height: auto;
 }
-
-/* sobre o fundo escuro, o texto solto fora do cartao clareia */
-.tela-entrada .entrada-aviso { color: rgba(236, 234, 244, .62); }
-
-.entrada { width: 100%; max-width: 940px; }
 
 .entrada-cartao {
-  max-width: 430px; margin: 0 auto;
-  background: var(--superficie);
-  border: 1px solid var(--borda);
-  border-radius: 20px;
-  box-shadow: var(--sombra-alta);
-  padding: 36px 34px 28px;
+  width: 100%;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(20, 14, 40, .32);
+  padding: 34px 32px;
   animation: entrada-surgir 460ms cubic-bezier(.22, 1, .36, 1) both;
 }
 
@@ -73,41 +45,49 @@
   from { opacity: 0; transform: translateY(14px) scale(.985); }
 }
 
-/* --------------------------------------------------------------- marca */
-
-/* A marca fica FORA do cartao e bem grande: e a porta de entrada, e assim
-   sobra area para passar o mouse por cima das particulas. */
-.entrada-marca {
-  display: flex; justify-content: center; align-items: center;
-  margin-bottom: 26px;
-}
-/* a logo e vetor: ocupa a largura do bloco e a altura sai da proporcao dela */
-.entrada-marca .marca-logo { width: 100%; }
-
-.entrada-titulo { text-align: center; margin-bottom: 26px; }
-.entrada-titulo h1 { font-size: 19px; font-weight: 650; }
-.entrada-titulo p { margin: 5px 0 0; font-size: 13px; color: var(--texto-fraco); }
-
 /* ---------------------------------------------------------------- form */
 
-.entrada-form .campo { margin-bottom: 16px; }
-.entrada-form .campo input { padding: 11px 13px; font-size: 15px; }
-.entrada-form .botao { margin-top: 8px; padding: 12px 16px; font-size: 14.5px; }
+/* o cartao e branco sempre, mesmo com o sistema no tema escuro: ele e uma
+   folha por cima da arte, nao uma superficie do sistema */
+.entrada-form .campo { margin-bottom: 18px; }
+.entrada-form .campo label {
+  display: block; margin-bottom: 7px;
+  font-size: 13.5px; font-weight: 620; color: #3b3552;
+}
+.entrada-form .campo input {
+  width: 100%; box-sizing: border-box;
+  padding: 13px 14px; font: inherit; font-size: 15px;
+  color: #1d1826;
+  background: #fbfbfd;
+  border: 1px solid #ddd9e6;
+  border-radius: 9px;
+  transition: border-color var(--transicao), box-shadow var(--transicao);
+}
+.entrada-form .campo input:hover { border-color: #c6c0d6; }
+.entrada-form .campo input:focus {
+  outline: none;
+  border-color: var(--marca-indigo);
+  box-shadow: 0 0 0 3px rgba(64, 49, 106, .16);
+}
+
+.entrada-form .botao {
+  width: 100%; margin-top: 10px;
+  padding: 14px 16px; font-size: 15px; font-weight: 640;
+  background: #3a2f63; border-color: #3a2f63; color: #fff;
+  border-radius: 9px;
+}
+.entrada-form .botao:hover { background: #473a77; border-color: #473a77; }
 
 /* mensagem de erro devolvida pelo servidor */
 .entrada-erro {
   display: flex; align-items: flex-start; gap: 9px;
-  background: var(--critico-suave);
-  border: 1px solid color-mix(in srgb, var(--critico) 32%, transparent);
-  border-left-width: 3px;
-  border-radius: var(--raio-p);
-  padding: 10px 13px; margin-bottom: 18px;
-  color: var(--critico); font-size: 13px; line-height: 1.45;
+  background: #fdecec; border: 1px solid #f3c2c2; border-left-width: 3px;
+  border-radius: 8px; padding: 11px 13px; margin-bottom: 18px;
+  color: #a32020; font-size: 13px; line-height: 1.45;
   animation: entrada-tremer 320ms cubic-bezier(.36, .07, .19, .97) both;
 }
 .entrada-erro::before { content: '!'; font-weight: 700; line-height: 1.45; }
 
-/* balanco curto e discreto: chama a atencao sem parecer alarme */
 @keyframes entrada-tremer {
   10%, 90% { transform: translateX(-1.5px); }
   20%, 80% { transform: translateX(3px); }
@@ -115,57 +95,22 @@
   40%, 60% { transform: translateX(5px); }
 }
 
-.entrada-rodape {
-  margin: 22px 0 0; padding-top: 18px;
-  border-top: 1px solid var(--borda);
-  text-align: center; font-size: 11.5px; color: var(--texto-fraco);
-}
-
+/* Lembrete discreto, fora do cartao. Some do desenho, mas nao do sistema: quem
+   entra aqui esta abrindo contrato que pertence a outra empresa, e vale estar
+   escrito. */
 .entrada-aviso {
-  margin: 18px 4px 0; text-align: center;
-  font-size: 11.5px; line-height: 1.5; color: var(--texto-fraco);
+  margin: 0; text-align: center;
+  font-size: 12px; line-height: 1.5;
+  color: rgba(255, 255, 255, .55);
+  text-shadow: 0 1px 8px rgba(20, 14, 40, .6);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .entrada-cartao, .entrada-erro { animation: none; }
 }
 
-@media (max-width: 460px) {
-  .tela-entrada { padding: 18px; align-items: start; padding-top: 8vh; }
-  .entrada-cartao { padding: 30px 24px 24px; border-radius: 16px; }
-}
-
-/* ------------------------------------------------- marca em particulas */
-
-/* A area tem altura fixa para o canvas ter onde existir. Enquanto o script
-   nao assume, o que aparece e a marca em texto — se ele nunca assumir, ela
-   fica, e ninguem ve buraco. */
-.entrada-marca[data-marca-particulas] {
-  position: relative;
-  /* a logo e larga (proporcao 3,7:1), entao a area segue essa forma: mais
-     largura do que altura, com folga para as particulas serem empurradas */
-  height: 300px;
-  /* o cursor so vira "mao" sobre a marca para dar a dica de que ela reage */
-  cursor: crosshair;
-}
-.entrada-marca .marca-canvas {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%;
-  display: block;
-  touch-action: none;
-}
-/* so esconde o texto depois que o canvas assumiu de fato; continua no fluxo
-   para o leitor de tela anunciar "ECOART Soluções" */
-.entrada-marca.com-particulas .marca-logo {
-  opacity: 0;
-  pointer-events: none;
-}
-
-@media (max-width: 720px) {
-
-  .entrada-marca[data-marca-particulas] { height: 180px; }
-}
-@media (max-width: 460px) {
-
-  .entrada-marca[data-marca-particulas] { height: 132px; }
+@media (max-width: 520px) {
+  .tela-entrada { padding: 26px 18px; align-items: center; }
+  .entrada { gap: 26px; }
+  .entrada-cartao { padding: 28px 22px; border-radius: 14px; }
 }

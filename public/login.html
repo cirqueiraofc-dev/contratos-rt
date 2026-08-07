@@ -5,10 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Entrar · Contratos e RT</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect width='64' height='64' rx='14' fill='%2340316a'/><text x='32' y='45' font-size='42' font-weight='700' font-family='system-ui,sans-serif' fill='%23e5762d' text-anchor='middle'>e</text></svg>" />
-<meta name="theme-color" content="#40316a" />
-<!-- a marca da entrada e desenhada em particulas a partir da fonte; pedir a
-     fonte junto com o CSS evita o desenho comecar com a fonte errada -->
-<link rel="preload" href="/fontes/Nunito-variavel-latino.woff2" as="font" type="font/woff2" crossorigin />
+<meta name="theme-color" content="#2c244a" />
+<link rel="preload" href="/imagens/fundo-entrada.jpg" as="image" />
 <link rel="preload" href="/fontes/InterVariable.woff2" as="font" type="font/woff2" crossorigin />
 <link rel="stylesheet" href="/css/app.css" />
 <link rel="stylesheet" href="/css/login.css" />
@@ -16,20 +14,11 @@
 <body class="tela-entrada">
 
   <main class="entrada">
-    <div class="entrada-marca" data-marca-particulas>
-      <!-- a versao clara da marca, porque esta tela tem fundo escuro sempre -->
-      <span class="marca-logo">
-        <img src="/imagens/marca-ecoart-escuro.svg" alt="ECOART Soluções" width="662" height="180" />
-      </span>
-    </div>
+    <!-- versao clara da marca: esta tela tem fundo escuro sempre -->
+    <img class="entrada-marca" src="/imagens/marca-ecoart-escuro.svg"
+         alt="ECOART Soluções" width="662" height="180" />
 
     <div class="entrada-cartao">
-
-      <div class="entrada-titulo">
-        <h1>Contratos e RT</h1>
-        <p>Gestão de contratos e responsabilidades técnicas</p>
-      </div>
-
       <form class="entrada-form" method="post" action="/entrar">
         <div class="campo">
           <label for="usuario">Usuário</label>
@@ -44,17 +33,12 @@
 
         <button class="botao primario largo" type="submit">Entrar</button>
       </form>
-
-      <p class="entrada-rodape">
-        Acesso restrito · ECOART Soluções Ltda
-      </p>
     </div>
 
     <p class="entrada-aviso">
-      Os contratos guardados aqui pertencem a terceiros. Não compartilhe seu acesso.
+      Acesso restrito · os contratos guardados aqui pertencem a terceiros
     </p>
   </main>
 
-  <script src="/js/marca-particulas.js"></script>
 </body>
 </html>
