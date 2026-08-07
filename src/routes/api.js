@@ -15,8 +15,8 @@ import {
   descartarTemporario, efetivar, gravarGerado, guardarTemporario, lerArquivo, lerTemporario, remover,
 } from '../arquivos.js';
 import {
-  STATUS_CONTRATO, STATUS_RT, lerEmpresa, listarContratos, montarContrato, montarPainel,
-  recalcularContrato,
+  STATUS_CONTRATO, STATUS_RT, empresaDoContrato, lerEmpresa, listarContratos, listarEmpresas,
+  montarContrato, montarPainel, recalcularContrato,
 } from '../servico.js';
 import { formatarData, formatarMoeda, hojeISO, somarMeses } from '../texto.js';
 
@@ -86,8 +86,8 @@ async function enviarPdf(res, arquivo, nomeExibido, inline = true) {
 
 /* ---------------------------------------------------------------- painel */
 
-api.get('/painel', rota((_req, res) => {
-  res.json(montarPainel());
+api.get('/painel', rota((req, res) => {
+  res.json(montarPainel(req.query.empresa));
 }));
 
 api.get('/disciplinas', rota((_req, res) => {
@@ -96,23 +96,57 @@ api.get('/disciplinas', rota((_req, res) => {
 
 /* ------------------------------------------------------------- cadastros */
 
-api.get('/empresa', rota((_req, res) => {
-  res.json(lerEmpresa());
-}));
-
-api.put('/empresa', rota((req, res) => {
-  const c = req.body ?? {};
-  run(
-    `UPDATE empresa SET razao_social = ?, cnpj = ?, crea_empresa = ?, endereco = ?, cidade = ?,
-            uf = ?, telefone = ?, email = ?, dias_alerta_rt = ?, dias_alerta_contrato = ?
-      WHERE id = 1`,
+/** Os campos que o formulario de empresa manda, ja limpos. */
+function camposDaEmpresa(c = {}) {
+  return [
     textoOuVazio(c.razao_social), textoOuVazio(c.cnpj), textoOuVazio(c.crea_empresa),
     textoOuVazio(c.endereco), textoOuVazio(c.cidade), textoOuVazio(c.uf).toUpperCase().slice(0, 2),
     textoOuVazio(c.telefone), textoOuVazio(c.email),
     Math.max(1, numeroOuNulo(c.dias_alerta_rt) ?? 60),
     Math.max(1, numeroOuNulo(c.dias_alerta_contrato) ?? 90),
+  ];
+}
+
+api.get('/empresas', rota((_req, res) => {
+  res.json(listarEmpresas());
+}));
+
+api.post('/empresas', rota((req, res) => {
+  const c = req.body ?? {};
+  exigir(textoOuVazio(c.razao_social), 'Informe a razão social da empresa.');
+  const { id } = run(
+    `INSERT INTO empresa (razao_social, cnpj, crea_empresa, endereco, cidade, uf,
+                          telefone, email, dias_alerta_rt, dias_alerta_contrato)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ...camposDaEmpresa(c),
   );
-  res.json(lerEmpresa());
+  res.status(201).json(lerEmpresa(id));
+}));
+
+api.put('/empresas/:id', rota((req, res) => {
+  const id = Number(req.params.id);
+  exigir(get('SELECT id FROM empresa WHERE id = ?', id), 'Empresa não encontrada.', 404);
+  run(
+    `UPDATE empresa SET razao_social = ?, cnpj = ?, crea_empresa = ?, endereco = ?, cidade = ?,
+            uf = ?, telefone = ?, email = ?, dias_alerta_rt = ?, dias_alerta_contrato = ?
+      WHERE id = ?`,
+    ...camposDaEmpresa(req.body ?? {}), id,
+  );
+  res.json(lerEmpresa(id));
+}));
+
+api.delete('/empresas/:id', rota((req, res) => {
+  const id = Number(req.params.id);
+  exigir(get('SELECT id FROM empresa WHERE id = ?', id), 'Empresa não encontrada.', 404);
+
+  // Apagar empresa com contrato levaria o contrato junto, e contrato de
+  // terceiro nao se apaga por tabela. Quem quiser sair tem que esvaziar antes.
+  const { total } = get('SELECT COUNT(*) AS total FROM contratos WHERE empresa_id = ?', id);
+  exigir(!total, `Esta empresa tem ${total} contrato(s). Remova ou transfira os contratos antes de excluí-la.`);
+  exigir(listarEmpresas().length > 1, 'O sistema precisa de pelo menos uma empresa cadastrada.');
+
+  run('DELETE FROM empresa WHERE id = ?', id);
+  res.json({ ok: true });
 }));
 
 api.get('/profissionais', rota((_req, res) => {
@@ -180,12 +214,16 @@ api.post('/contratos', rota(async (req, res) => {
   const valor = numeroOuNulo(c.valor);
   const vencimento = dataOuNulo(c.data_vencimento);
   const vigencia = numeroOuNulo(c.vigencia_meses);
+  // O contrato nasce dentro da empresa que esta aberta na tela; sem isso ele
+  // cairia sempre na primeira e sumiria da lista de quem acabou de cadastrar.
+  const dono = lerEmpresa(c.empresa_id);
   const { id } = run(
-    `INSERT INTO contratos (numero, contratante, contratante_cnpj, objeto, valor, data_assinatura,
+    `INSERT INTO contratos (empresa_id, numero, contratante, contratante_cnpj, objeto, valor, data_assinatura,
                             data_vencimento, vigencia_meses, status, observacoes, arquivo, arquivo_nome,
                             texto, valor_original, data_vencimento_original, vigencia_meses_original,
                             criado_em, atualizado_em)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ativo', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ativo', ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    dono.id,
     textoOuVazio(c.numero), textoOuVazio(c.contratante), textoOuVazio(c.contratante_cnpj),
     textoOuVazio(c.objeto), valor, dataOuNulo(c.data_assinatura),
     vencimento, vigencia, textoOuVazio(c.observacoes),
@@ -218,6 +256,7 @@ api.get('/contratos', rota((req, res) => {
   res.json(listarContratos({
     status: textoOuVazio(req.query.status),
     busca: textoOuVazio(req.query.q),
+    empresaId: req.query.empresa,
   }));
 }));
 
@@ -530,7 +569,7 @@ api.post('/contratos/:id/cat', rota(async (req, res) => {
   exigir(contrato, 'Contrato não encontrado.', 404);
   exigir(contrato.status === 'concluido', 'Conclua o contrato antes de gerar a CAT.');
 
-  const empresa = lerEmpresa();
+  const empresa = empresaDoContrato(id);
   const rts = all('SELECT * FROM rts WHERE contrato_id = ? ORDER BY disciplina', id);
   const comArt = rts.filter((rt) => rt.numero_art && rt.status !== 'dispensada');
   exigir(comArt.length, 'Nenhuma ART registrada neste contrato — registre as ARTs antes de gerar a CAT.');

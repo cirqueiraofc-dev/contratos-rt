@@ -1,3 +1,23 @@
+/**
+ * A empresa aberta na tela. Fica aqui, e nao em cada chamada, para que nao
+ * exista rota que esqueca de mandar — esquecer significaria mostrar contrato
+ * de outra empresa, ou gerar documento com o CNPJ errado.
+ */
+let empresaEscolhida = null;
+
+export function usarEmpresa(id) {
+  empresaEscolhida = id ?? null;
+}
+
+export function empresaEmUso() {
+  return empresaEscolhida;
+}
+
+function comEmpresa(caminho) {
+  if (!empresaEscolhida) return caminho;
+  return `${caminho}${caminho.includes('?') ? '&' : '?'}empresa=${encodeURIComponent(empresaEscolhida)}`;
+}
+
 async function pedir(caminho, opcoes = {}) {
   const resposta = await fetch(`/api${caminho}`, opcoes);
   if (resposta.status === 204) return null;
@@ -22,11 +42,13 @@ const enviarArquivo = (caminho, arquivo) => {
 };
 
 export const api = {
-  painel: () => pedir('/painel'),
+  painel: () => pedir(comEmpresa('/painel')),
   disciplinas: () => pedir('/disciplinas'),
 
-  empresa: () => pedir('/empresa'),
-  salvarEmpresa: (dados) => json('PUT')('/empresa', dados),
+  empresas: () => pedir('/empresas'),
+  criarEmpresa: (dados) => json('POST')('/empresas', dados),
+  salvarEmpresa: (id, dados) => json('PUT')(`/empresas/${id}`, dados),
+  removerEmpresa: (id) => pedir(`/empresas/${id}`, { method: 'DELETE' }),
 
   /**
    * Baixa o backup. Nao usa `pedir` porque a resposta e binaria, nao JSON;
@@ -61,11 +83,11 @@ export const api = {
     const busca = new URLSearchParams(
       Object.entries(filtros).filter(([, v]) => v),
     ).toString();
-    return pedir(`/contratos${busca ? `?${busca}` : ''}`);
+    return pedir(comEmpresa(`/contratos${busca ? `?${busca}` : ''}`));
   },
   contrato: (id) => pedir(`/contratos/${id}`),
   analisarContrato: (arquivo) => enviarArquivo('/contratos/analisar', arquivo),
-  criarContrato: (dados) => json('POST')('/contratos', dados),
+  criarContrato: (dados) => json('POST')('/contratos', { ...dados, empresa_id: empresaEscolhida }),
   atualizarContrato: (id, dados) => json('PUT')(`/contratos/${id}`, dados),
   removerContrato: (id) => pedir(`/contratos/${id}`, { method: 'DELETE' }),
   mudarStatus: (id, dados) => json('POST')(`/contratos/${id}/status`, dados),

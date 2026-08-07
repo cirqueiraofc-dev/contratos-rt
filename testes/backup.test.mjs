@@ -90,7 +90,7 @@ test('cadastra um contrato com PDF para o backup ter o que guardar', async () =>
   assert.ok(criado.ok);
   estado.contrato = await criado.json();
 
-  await fetch(`${url}/api/empresa`, {
+  await fetch(`${url}/api/empresas/1`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ razao_social: 'ECOART SOLUÇÕES LTDA', cnpj: '00.000.000/0001-00' }),
@@ -144,7 +144,7 @@ test('o leia-me explica o que fazer com o arquivo', () => {
 test('a cópia sai consistente mesmo com o banco em uso', async () => {
   // grava algo logo antes de pedir o backup: e o caso em que copiar o .db na
   // mao pegaria o arquivo sem a transacao, que ainda estaria so no WAL
-  await fetch(`${url}/api/empresa`, {
+  await fetch(`${url}/api/empresas/1`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ razao_social: 'ECOART SOLUÇÕES LTDA', cnpj: '11.222.333/0001-44' }),

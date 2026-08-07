@@ -1,4 +1,4 @@
-import { api } from './api.js';
+import { api, empresaEmUso, usarEmpresa } from './api.js';
 import { telaConfiguracoes, telaContrato, telaContratos, telaPainel } from './telas.js';
 import {
   fluxoConcluir, fluxoEditarContrato, fluxoEditarRt, fluxoImportarArt, fluxoNovoContrato,
@@ -9,6 +9,12 @@ import { $, $$, aviso, escapar, formatarDataHora, lerCampos } from './util.js';
 const conteudo = $('#conteudo');
 let disciplinas = [];
 let contratoAtual = null;
+let empresas = [];
+
+// Onde fica guardada a empresa aberta. E escolha de tela, nao dado de
+// contrato: mora no navegador de quem esta usando, e o servidor so a recebe
+// como parametro. Trocar de maquina comeca de novo na primeira empresa.
+const MEMORIA_EMPRESA = 'contratos-rt:empresa';
 
 /* ---------------------------------------------------------------- rotas */
 
@@ -195,20 +201,48 @@ async function carregarHistorico(id) {
   }
 }
 
-async function mostrarConfiguracoes() {
-  const [empresa, profissionais] = await Promise.all([api.empresa(), api.profissionais()]);
-  conteudo.innerHTML = telaConfiguracoes(empresa, profissionais, disciplinas);
+async function mostrarConfiguracoes(editandoId = empresaEmUso()) {
+  const [lista, profissionais] = await Promise.all([api.empresas(), api.profissionais()]);
+  empresas = lista;
+  conteudo.innerHTML = telaConfiguracoes(empresas, editandoId, profissionais, disciplinas);
 
-  $('#form-empresa').addEventListener('submit', async (ev) => {
+  const formulario = $('#form-empresa');
+  formulario.addEventListener('submit', async (ev) => {
     ev.preventDefault();
+    const id = ev.target.dataset.empresaId;
     try {
-      const salvo = await api.salvarEmpresa(lerCampos(ev.target));
-      atualizarMarca(salvo);
-      aviso('Dados da empresa salvos.', 'sucesso');
+      const salvo = id
+        ? await api.salvarEmpresa(id, lerCampos(ev.target))
+        : await api.criarEmpresa(lerCampos(ev.target));
+      aviso(id ? 'Dados da empresa salvos.' : `Empresa ${salvo.razao_social} cadastrada.`, 'sucesso');
+      // empresa recem-criada ja entra aberta: e o que quem cadastrou espera
+      if (!id) escolherEmpresa(salvo.id);
+      await recarregarEmpresas();
+      await mostrarConfiguracoes(salvo.id);
     } catch (erro) {
       aviso(erro.message, 'erro');
     }
   });
+
+  for (const botao of $$('[data-editar-empresa]', conteudo)) {
+    botao.addEventListener('click', () => mostrarConfiguracoes(botao.dataset.editarEmpresa));
+  }
+
+  for (const botao of $$('[data-remover-empresa]', conteudo)) {
+    botao.addEventListener('click', async () => {
+      const alvo = empresas.find((e) => String(e.id) === botao.dataset.removerEmpresa);
+      if (!confirm(`Excluir a empresa ${alvo?.razao_social || ''}? Isso não pode ser desfeito.`)) return;
+      try {
+        await api.removerEmpresa(botao.dataset.removerEmpresa);
+        if (String(empresaEmUso()) === botao.dataset.removerEmpresa) escolherEmpresa(null);
+        await recarregarEmpresas();
+        aviso('Empresa excluída.', 'sucesso');
+        await mostrarConfiguracoes();
+      } catch (erro) {
+        aviso(erro.message, 'erro');
+      }
+    });
+  }
 
   $('#baixar-backup').addEventListener('click', async (ev) => {
     const botao = ev.currentTarget;
@@ -253,6 +287,9 @@ async function mostrarConfiguracoes() {
       const r = await api.restaurarBackup(arquivo);
       aviso(`Restaurado: ${r.contratos} contrato(s) e ${r.pdfs} arquivo(s).`, 'sucesso');
       campo.value = '';
+      // a copia traz as empresas dela; a escolha guardada aqui pode nao existir mais
+      escolherEmpresa(null);
+      await recarregarEmpresas();
       await mostrarConfiguracoes();
     } catch (erro) {
       aviso(erro.message, 'erro');
@@ -286,8 +323,55 @@ function abrirNovoContrato() {
   fluxoNovoContrato((contrato) => irPara(`#/contrato/${contrato.id}`));
 }
 
-function atualizarMarca(empresa) {
-  $('#marca-empresa').textContent = empresa?.razao_social || 'Configure a empresa';
+/**
+ * Grava a empresa aberta e avisa a camada de rede. Passar `null` volta para a
+ * primeira, que e o que o servidor faz quando o id nao existe mais.
+ */
+function escolherEmpresa(id) {
+  usarEmpresa(id ?? null);
+  try {
+    if (id) localStorage.setItem(MEMORIA_EMPRESA, String(id));
+    else localStorage.removeItem(MEMORIA_EMPRESA);
+  } catch {
+    // navegador com armazenamento bloqueado: a escolha vale so nesta aba
+  }
+}
+
+async function recarregarEmpresas() {
+  empresas = await api.empresas();
+  const aberta = empresas.find((e) => String(e.id) === String(empresaEmUso())) ?? empresas[0];
+  if (aberta && String(aberta.id) !== String(empresaEmUso())) escolherEmpresa(aberta.id);
+  desenharSeletorEmpresa(aberta);
+}
+
+/**
+ * Com uma empresa so, um seletor seria enfeite: mostra o nome e pronto. A
+ * partir de duas ele aparece, porque ai a pergunta "de quem e esta tela?"
+ * passa a existir de verdade.
+ */
+function desenharSeletorEmpresa(aberta) {
+  const alvo = $('#marca-empresa');
+  if (!alvo) return;
+
+  if (empresas.length < 2) {
+    alvo.textContent = aberta?.razao_social || 'Configure a empresa';
+    return;
+  }
+
+  alvo.innerHTML = `
+    <select id="troca-empresa" aria-label="Empresa aberta">
+      ${empresas.map((e) => `
+        <option value="${e.id}"${String(e.id) === String(aberta?.id) ? ' selected' : ''}>
+          ${escapar(e.razao_social || 'Empresa sem nome')}
+        </option>`).join('')}
+    </select>`;
+
+  $('#troca-empresa').addEventListener('change', async (ev) => {
+    escolherEmpresa(ev.target.value);
+    await recarregarEmpresas();
+    await atualizarBadge();
+    navegar();
+  });
 }
 
 async function atualizarBadge() {
@@ -303,9 +387,18 @@ window.addEventListener('hashchange', navegar);
 
 (async () => {
   try {
-    const [lista, empresa] = await Promise.all([api.disciplinas(), api.empresa()]);
-    disciplinas = lista;
-    atualizarMarca(empresa);
+    // a escolha guardada entra antes de qualquer chamada, senao a primeira
+    // tela viria da empresa errada e piscaria ao trocar
+    let guardada = null;
+    try {
+      guardada = localStorage.getItem(MEMORIA_EMPRESA);
+    } catch {
+      // sem armazenamento: comeca na primeira empresa
+    }
+    usarEmpresa(guardada);
+
+    disciplinas = await api.disciplinas();
+    await recarregarEmpresas();
   } catch (erro) {
     aviso(`Não foi possível falar com o servidor: ${erro.message}`, 'erro');
   }

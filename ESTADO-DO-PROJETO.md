@@ -225,7 +225,29 @@ A tela de entrada e o que ela carrega (`/css/`, `/imagens/`, `/fontes/`) respond
 porteira, senão o visitante veria um formulário sem estilo; nada sob `/api` está nesse conjunto.
 Há um `Sair` no rodapé da barra lateral.
 
-### 6.6 As fontes são hospedadas junto, não vêm de CDN
+### 6.6 Cabe mais de uma empresa, e o contrato sabe de quem é
+
+A tabela `empresa` nasceu com `CHECK (id = 1)`: uma empresa e ponto. Passou a caber mais de uma, e
+cada contrato carrega `empresa_id`. O que decide o CNPJ e o registro do atestado é a empresa **do
+contrato** (`empresaDoContrato`), nunca a que está aberta na tela - errar isso significa entregar
+ao contratante um atestado com o registro da empresa errada, que é o pior defeito que este sistema
+poderia ter.
+
+As listas, o painel e os alertas são filtrados por empresa. Não há visão "todas juntas": a
+separação é o que impede o erro acima. A empresa aberta fica no `localStorage` do navegador e viaja
+como `?empresa=` em cada chamada; o servidor não guarda essa escolha, e um id que não existe mais
+cai na primeira empresa em vez de deixar a tela vazia.
+
+Os responsáveis técnicos continuam **compartilhados** entre as empresas - o mesmo engenheiro pode
+ser RT de duas. Se um dia isso atrapalhar, é a próxima coisa a separar.
+
+No SQLite não se remove um `CHECK` com `ALTER`: a migração recria a tabela e troca o nome,
+preservando os ids. O índice de `empresa_id` é criado **depois** da migração, não junto das tabelas
+- criá-lo antes derruba o arranque de quem já tinha banco, que é justamente quem não pode ficar sem.
+`testes/migracao.test.mjs` monta um banco no formato antigo, com dados dentro, e prova que ele
+atravessa inteiro.
+
+### 6.7 As fontes são hospedadas junto, não vêm de CDN
 
 `public/fontes` guarda a Inter (interface) e a Nunito (marca ECOART), ambas variáveis e com licença
 livre. Servidas com cache de um ano e `immutable`; trocar a fonte significa trocar o nome do

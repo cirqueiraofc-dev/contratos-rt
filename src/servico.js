@@ -9,8 +9,38 @@ import { diasAte, formatarData, hojeISO } from './texto.js';
 export const STATUS_CONTRATO = ['ativo', 'concluido', 'cancelado'];
 export const STATUS_RT = ['pendente', 'emitida', 'baixada', 'dispensada'];
 
-export function lerEmpresa() {
-  return get('SELECT * FROM empresa WHERE id = 1');
+export function listarEmpresas() {
+  // o total de contratos decide se a empresa pode ser excluida, e a tela
+  // mostra o numero para que a resposta "nao pode" ja venha explicada
+  return all(
+    `SELECT e.*, (SELECT COUNT(*) FROM contratos c WHERE c.empresa_id = e.id) AS total_contratos
+       FROM empresa e
+      ORDER BY e.razao_social = '', e.razao_social, e.id`,
+  );
+}
+
+/**
+ * A empresa pedida, ou a primeira que existir.
+ *
+ * O sistema nunca fica sem empresa: mesmo recem-instalado ha a linha 1, em
+ * branco, esperando ser preenchida. Cair na primeira quando o id nao existe
+ * evita que uma escolha velha guardada no navegador — de uma empresa que foi
+ * apagada — deixe a tela em branco sem explicacao.
+ */
+export function lerEmpresa(id = null) {
+  if (id !== null && id !== undefined && id !== '') {
+    const pedida = get('SELECT * FROM empresa WHERE id = ?', Number(id));
+    if (pedida) return pedida;
+  }
+  return get('SELECT * FROM empresa ORDER BY id LIMIT 1');
+}
+
+/** O dono do contrato — e dele que saem CNPJ e registro nos documentos. */
+export function empresaDoContrato(contratoId) {
+  return get(
+    'SELECT e.* FROM empresa e JOIN contratos c ON c.empresa_id = e.id WHERE c.id = ?',
+    contratoId,
+  ) ?? lerEmpresa();
 }
 
 export function aditivosDoContrato(contratoId) {
@@ -214,7 +244,7 @@ export function situacaoContrato(contrato, rts, documentos, empresa) {
 export function montarContrato(id) {
   const contrato = get('SELECT * FROM contratos WHERE id = ?', id);
   if (!contrato) return null;
-  const empresa = lerEmpresa();
+  const empresa = lerEmpresa(contrato.empresa_id);
   const rts = rtsDoContrato(contrato.id, empresa.dias_alerta_rt, contrato.data_vencimento);
   const documentos = documentosDoContrato(contrato.id);
   const aditivos = aditivosDoContrato(contrato.id);
@@ -224,25 +254,29 @@ export function montarContrato(id) {
 }
 
 /** Lista resumida para a tela de contratos. */
-export function listarContratos({ status = '', busca = '' } = {}) {
-  const empresa = lerEmpresa();
+export function listarContratos({ status = '', busca = '', empresaId = null } = {}) {
+  const empresa = lerEmpresa(empresaId);
   const filtros = [];
   const params = [];
+  // Sem empresa nao ha lista: um contrato de outra empresa aparecendo aqui
+  // seria um documento gerado com o CNPJ errado esperando para acontecer.
+  filtros.push('c.empresa_id = ?');
+  params.push(empresa.id);
   if (status && STATUS_CONTRATO.includes(status)) {
-    filtros.push('status = ?');
+    filtros.push('c.status = ?');
     params.push(status);
   }
   if (busca) {
-    filtros.push('(numero LIKE ? OR contratante LIKE ? OR objeto LIKE ?)');
+    filtros.push('(c.numero LIKE ? OR c.contratante LIKE ? OR c.objeto LIKE ?)');
     const alvo = `%${busca}%`;
     params.push(alvo, alvo, alvo);
   }
-  const onde = filtros.length ? `WHERE ${filtros.join(' AND ')}` : '';
   const linhas = all(
-    `SELECT c.id, c.numero, c.contratante, c.objeto, c.valor, c.data_assinatura, c.data_vencimento,
-            c.vigencia_meses, c.status, c.data_conclusao, c.arquivo, c.criado_em,
+    `SELECT c.id, c.empresa_id, c.numero, c.contratante, c.objeto, c.valor, c.data_assinatura,
+            c.data_vencimento, c.vigencia_meses, c.status, c.data_conclusao, c.arquivo, c.criado_em,
             (SELECT COUNT(*) FROM aditivos a WHERE a.contrato_id = c.id) AS total_aditivos
-       FROM contratos c ${onde ? onde.replace(/\b(numero|contratante|objeto|status)\b/g, 'c.$1') : ''}
+       FROM contratos c
+      WHERE ${filtros.join(' AND ')}
       ORDER BY (c.status = 'ativo') DESC, COALESCE(c.data_vencimento, '9999') ASC, c.id DESC`,
     ...params,
   );
@@ -256,9 +290,9 @@ export function listarContratos({ status = '', busca = '' } = {}) {
 }
 
 /** Numeros e listas do painel inicial. */
-export function montarPainel() {
-  const empresa = lerEmpresa();
-  const contratos = listarContratos();
+export function montarPainel(empresaId = null) {
+  const empresa = lerEmpresa(empresaId);
+  const contratos = listarContratos({ empresaId: empresa.id });
   const ativos = contratos.filter((c) => c.status === 'ativo');
 
   const alertas = [];
@@ -281,6 +315,11 @@ export function montarPainel() {
 
   return {
     hoje: hojeISO(),
+    empresa: {
+      id: empresa.id,
+      razao_social: empresa.razao_social,
+      cnpj: empresa.cnpj,
+    },
     empresa_configurada: Boolean(empresa.razao_social && empresa.cnpj),
     indicadores: {
       contratos_ativos: ativos.length,

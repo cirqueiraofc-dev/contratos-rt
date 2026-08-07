@@ -314,7 +314,32 @@ export function telaContrato(contrato, disciplinas) {
 
 /* -------------------------------------------------------- configuracoes */
 
-export function telaConfiguracoes(empresa, profissionais, disciplinas) {
+export function telaConfiguracoes(empresas, editandoId, profissionais, disciplinas) {
+  // `editandoId` vazio significa formulario em branco para uma empresa nova
+  const empresa = empresas.find((e) => String(e.id) === String(editandoId)) ?? {
+    id: '', razao_social: '', cnpj: '', crea_empresa: '', endereco: '', cidade: '', uf: '',
+    telefone: '', email: '', dias_alerta_rt: 60, dias_alerta_contrato: 90,
+  };
+  const nova = !empresa.id;
+
+  const listaEmpresas = `
+    <table class="tabela">
+      <thead><tr><th>Razão social</th><th>CNPJ</th><th>Registro</th><th>Contratos</th><th></th></tr></thead>
+      <tbody>${empresas.map((e) => `
+        <tr${String(e.id) === String(empresa.id) ? ' class="linha-ativa"' : ''}>
+          <td><strong>${escapar(e.razao_social || 'Empresa sem nome')}</strong></td>
+          <td>${escapar(e.cnpj || '—')}</td>
+          <td>${escapar(e.crea_empresa || '—')}</td>
+          <td>${e.total_contratos ?? 0}</td>
+          <td style="text-align:right;white-space:nowrap">
+            <button class="botao pequeno" data-editar-empresa="${e.id}">Editar</button>
+            ${empresas.length > 1 && !e.total_contratos
+              ? `<button class="botao pequeno perigo" data-remover-empresa="${e.id}">Excluir</button>`
+              : ''}
+          </td>
+        </tr>`).join('')}</tbody>
+    </table>`;
+
   const listaProfissionais = profissionais.length
     ? `<table class="tabela">
          <thead><tr><th>Nome</th><th>Título</th><th>Registro</th><th>Modalidades</th><th></th></tr></thead>
@@ -333,13 +358,28 @@ export function telaConfiguracoes(empresa, profissionais, disciplinas) {
     <div class="cabecalho-tela">
       <div>
         <h1>Configurações</h1>
-        <p>Dados usados no preenchimento automático do atestado e do requerimento de CAT</p>
+        <p>Empresas, responsáveis técnicos e a cópia de segurança</p>
       </div>
     </div>
 
     <div class="cartao">
-      <div class="cartao-titulo"><h2>Dados da empresa (contratada)</h2></div>
-      <form id="form-empresa">
+      <div class="cartao-titulo">
+        <h2>Empresas</h2>
+        <button class="botao pequeno" data-editar-empresa="">Adicionar empresa</button>
+      </div>
+      <p>
+        Cada contrato pertence a uma destas empresas, e é o CNPJ e o registro dela
+        que saem no atestado e no requerimento. Troque de empresa pelo seletor no
+        alto da barra lateral.
+      </p>
+      ${listaEmpresas}
+    </div>
+
+    <div class="cartao">
+      <div class="cartao-titulo">
+        <h2>${nova ? 'Nova empresa' : `Dados de ${escapar(empresa.razao_social || 'empresa sem nome')}`}</h2>
+      </div>
+      <form id="form-empresa" data-empresa-id="${escapar(String(empresa.id))}">
         <div class="grade-campos">
           ${campo({ nome: 'razao_social', rotulo: 'Razão social', valor: empresa.razao_social, largo: true })}
           ${campo({ nome: 'cnpj', rotulo: 'CNPJ', valor: empresa.cnpj })}
@@ -352,7 +392,7 @@ export function telaConfiguracoes(empresa, profissionais, disciplinas) {
           ${campo({ nome: 'dias_alerta_rt', rotulo: 'Alerta de ART (dias antes)', tipo: 'number', valor: empresa.dias_alerta_rt, atributos: 'min="1"' })}
           ${campo({ nome: 'dias_alerta_contrato', rotulo: 'Alerta de contrato (dias antes)', tipo: 'number', valor: empresa.dias_alerta_contrato, atributos: 'min="1"' })}
         </div>
-        <button class="botao primario" type="submit">Salvar dados da empresa</button>
+        <button class="botao primario" type="submit">${nova ? 'Cadastrar empresa' : 'Salvar dados da empresa'}</button>
       </form>
     </div>
 

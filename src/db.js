@@ -12,7 +12,7 @@ db.exec('PRAGMA foreign_keys = ON');
 
 db.exec(`
 CREATE TABLE IF NOT EXISTS empresa (
-  id                   INTEGER PRIMARY KEY CHECK (id = 1),
+  id                   INTEGER PRIMARY KEY AUTOINCREMENT,
   razao_social         TEXT NOT NULL DEFAULT '',
   cnpj                 TEXT NOT NULL DEFAULT '',
   crea_empresa         TEXT NOT NULL DEFAULT '',
@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS profissionais (
 
 CREATE TABLE IF NOT EXISTS contratos (
   id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  empresa_id       INTEGER NOT NULL DEFAULT 1 REFERENCES empresa(id),
   numero           TEXT NOT NULL,
   contratante      TEXT NOT NULL DEFAULT '',
   contratante_cnpj TEXT NOT NULL DEFAULT '',
@@ -123,6 +124,45 @@ CREATE INDEX IF NOT EXISTS idx_docs_contrato  ON documentos (contrato_id);
 CREATE INDEX IF NOT EXISTS idx_eventos_contrato ON eventos (contrato_id);
 `);
 
+/**
+ * A tabela `empresa` nasceu com `CHECK (id = 1)`: cabia uma empresa e ponto.
+ * Passou a caber mais de uma, e no SQLite nao se remove um CHECK com ALTER —
+ * o jeito e recriar a tabela e mudar o nome. A copia preserva os ids, entao
+ * a empresa que ja estava la continua sendo a de numero 1 e os contratos
+ * existentes seguem apontando para ela.
+ */
+const empresaTravada = /CHECK\s*\(\s*id\s*=\s*1\s*\)/i.test(
+  db.prepare("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'empresa'").get()?.sql ?? '',
+);
+
+if (empresaTravada) {
+  db.exec('PRAGMA foreign_keys = OFF');
+  db.exec(`
+    BEGIN;
+    CREATE TABLE empresa_nova (
+      id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+      razao_social         TEXT NOT NULL DEFAULT '',
+      cnpj                 TEXT NOT NULL DEFAULT '',
+      crea_empresa         TEXT NOT NULL DEFAULT '',
+      endereco             TEXT NOT NULL DEFAULT '',
+      cidade               TEXT NOT NULL DEFAULT '',
+      uf                   TEXT NOT NULL DEFAULT '',
+      telefone             TEXT NOT NULL DEFAULT '',
+      email                TEXT NOT NULL DEFAULT '',
+      dias_alerta_rt       INTEGER NOT NULL DEFAULT 60,
+      dias_alerta_contrato INTEGER NOT NULL DEFAULT 90
+    );
+    INSERT INTO empresa_nova
+      SELECT id, razao_social, cnpj, crea_empresa, endereco, cidade, uf,
+             telefone, email, dias_alerta_rt, dias_alerta_contrato
+        FROM empresa;
+    DROP TABLE empresa;
+    ALTER TABLE empresa_nova RENAME TO empresa;
+    COMMIT;
+  `);
+  db.exec('PRAGMA foreign_keys = ON');
+}
+
 db.exec(`INSERT OR IGNORE INTO empresa (id) VALUES (1)`);
 
 /** Acrescenta uma coluna a uma tabela ja existente, se ela ainda nao estiver la. */
@@ -134,6 +174,18 @@ function garantirColuna(tabela, coluna, definicao) {
   }
   return false;
 }
+
+// Contrato que existia antes de haver mais de uma empresa pertence a primeira
+// delas — que e a unica que existia quando ele foi cadastrado.
+if (garantirColuna('contratos', 'empresa_id', 'INTEGER NOT NULL DEFAULT 1')) {
+  db.exec('UPDATE contratos SET empresa_id = 1 WHERE empresa_id IS NULL');
+}
+
+// O indice fica aqui embaixo, e nao junto das tabelas la em cima: num banco
+// que ja existia, a coluna `empresa_id` so passa a existir na linha acima.
+// Criar o indice antes disso derruba o sistema no arranque — para quem ja
+// usava, e so para essa pessoa, que e justamente quem nao pode ficar sem.
+db.exec('CREATE INDEX IF NOT EXISTS idx_contratos_empresa ON contratos (empresa_id)');
 
 /**
  * Valores originais do contrato, antes de qualquer termo aditivo.

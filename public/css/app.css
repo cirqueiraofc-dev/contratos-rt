@@ -214,7 +214,25 @@ p { margin: 0 0 .6em; }
   margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--borda);
 }
 .marca-sistema strong { display: block; font-size: 14px; font-weight: 650; }
-.marca-sistema small { display: block; color: var(--texto-fraco); font-size: 12px; }
+.marca-sistema #marca-empresa { display: block; color: var(--texto-fraco); font-size: 12px; }
+
+/* O seletor de empresa nao se anuncia: parece o subtitulo que ele substitui,
+   e so ao passar o mouse mostra que e clicavel. Quem tem uma empresa so nem
+   chega a ve-lo — a tela continua mostrando o nome em texto. */
+#troca-empresa {
+  width: 100%; max-width: 100%;
+  margin: -3px 0 0 -5px; padding: 3px 5px;
+  border: 1px solid transparent; border-radius: var(--raio-p);
+  background: transparent; color: var(--texto-fraco);
+  font: inherit; font-size: 12px; cursor: pointer;
+  transition: background var(--transicao), border-color var(--transicao), color var(--transicao);
+}
+#troca-empresa:hover { background: var(--superficie-2); border-color: var(--borda); color: var(--texto); }
+#troca-empresa:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
+
+/* a empresa que esta aberta no formulario logo abaixo da tabela */
+.tabela .linha-ativa > td { background: var(--acento-suave); }
+.tabela .linha-ativa > td:first-child { box-shadow: inset 3px 0 0 var(--acento); }
 
 .menu { display: flex; flex-direction: column; gap: 2px; }
 .menu a {
@@ -292,7 +310,7 @@ a.sub:hover { color: var(--acento); }
   border-bottom: 1px solid var(--borda);
 }
 .cartao-titulo h2 { margin: 0; }
-.cartao-titulo .direita { margin-left: auto; }
+.cartao-titulo .direita, .cartao-titulo .botao { margin-left: auto; }
 
 /* Indicadores: o que exige acao ganha cor e barra lateral; o que esta zerado
    ou em dia recua para cinza. Assim o painel se le de relance, sem precisar
