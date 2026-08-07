@@ -88,6 +88,10 @@
   animation: entrada-tremer 320ms cubic-bezier(.36, .07, .19, .97) both;
 }
 .entrada-erro::before { content: '!'; font-weight: 700; line-height: 1.45; }
+/* o `display: flex` acima ganha do `hidden` do HTML, que so vale enquanto
+   ninguem escreve display nenhum. Sem esta linha o aviso de senha errada
+   aparece sempre, inclusive na primeira visita. */
+.entrada-erro[hidden] { display: none; }
 
 /* balanco curto e discreto: chama a atencao sem parecer alarme */
 @keyframes entrada-tremer {
