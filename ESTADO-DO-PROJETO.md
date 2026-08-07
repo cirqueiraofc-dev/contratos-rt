@@ -107,6 +107,7 @@ PDFs gerados**. Mais os testes de senha e da rota de saúde.
 | --- | --- |
 | `APP_SENHA` | Senha de acesso. **Sempre defina** ao publicar na internet. Sem ela o sistema roda aberto |
 | `APP_USUARIO` | Nome exigido no campo Usuário. Em branco, qualquer nome serve e só a senha vale |
+| `R2_CONTA`, `R2_BALDE`, `R2_CHAVE_ID`, `R2_CHAVE_SECRETA` | Cloudflare R2. Com as quatro, os PDFs e a cópia do banco vivem fora do Render e sobrevivem a publicação e reinício. Faltando qualquer uma, tudo fica no disco efêmero |
 | `PORT` | Porta (padrão 3000). No Render é definida automaticamente |
 | `DATA_DIR` | Pasta do banco (padrão `./data`) |
 | `UPLOAD_DIR` | Pasta dos PDFs (padrão `./uploads`) |
@@ -247,7 +248,40 @@ preservando os ids. O índice de `empresa_id` é criado **depois** da migração
 `testes/migracao.test.mjs` monta um banco no formato antigo, com dados dentro, e prova que ele
 atravessa inteiro.
 
-### 6.7 As fontes são hospedadas junto, não vêm de CDN
+### 6.7 O cofre: o banco guardado fora do Render
+
+O plano gratuito do Render não tem disco. O sistema de arquivos volta ao estado da build a cada
+publicação **e a cada reinício** - e o serviço reinicia sozinho depois de um tempo parado. Os PDFs
+já escapavam disso: com o R2 configurado eles nunca chegam a tocar o disco de lá (`arquivos.js`).
+O que ficava exposto era o banco - empresas, contratos, RTs, datas -, que é justamente o que
+ninguém remonta de memória.
+
+`src/cofre.js` resolve com duas metades. Depois de cada escrita, uma cópia do banco sobe para o R2;
+ao subir com o disco em branco, essa cópia desce **antes de o banco abrir**. Por isso os imports do
+sistema em `server.js` são dinâmicos: `db.js` abre o arquivo no instante em que é carregado, e
+trocar o arquivo por baixo dele depois não faria efeito.
+
+Três decisões que valem mais que o código:
+
+- **Não sobe a cada escrita.** Espera 2,5s de silêncio e sobe uma vez. Cadastrar um contrato com
+  cinco RTs são seis escritas e um envio só. O que sobe é sempre o estado final.
+- **Não restaura por cima de dado que existe.** Só desce a cópia se o banco local estiver vazio de
+  verdade (nenhum contrato, nenhuma empresa preenchida). Restaurar sobre um banco com conteúdo
+  seria trocar o certo pelo antigo sem ninguém pedir.
+- **Falha de leitura derruba o arranque.** Se o R2 está ligado e a leitura da cópia quebra, o
+  processo morre em vez de subir vazio. Subir vazio com o cofre cheio faria a primeira escrita
+  sobrescrever a cópia boa - e aí o dado teria acabado de verdade. Ficar fora do ar por minutos é
+  barato perto disso.
+
+Além da cópia viva (`cofre/banco.db`), fica uma por dia em `cofre/historico/AAAA-MM-DD.db`. São
+alguns KB e desfazem um dia ruim.
+
+`VACUUM INTO` em vez de copiar o arquivo: com escrita em andamento, uma cópia crua sai pela metade.
+
+**O cofre só funciona com o R2 configurado.** Sem `R2_CHAVE_ID` e `R2_CHAVE_SECRETA` o sistema roda
+igual, grava tudo em disco e avisa no arranque - e aí os dados voltam a se perder a cada publicação.
+
+### 6.8 As fontes são hospedadas junto, não vêm de CDN
 
 `public/fontes` guarda a Inter (interface) e a Nunito (marca ECOART), ambas variáveis e com licença
 livre. Servidas com cache de um ano e `immutable`; trocar a fonte significa trocar o nome do

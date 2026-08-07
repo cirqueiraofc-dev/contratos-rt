@@ -211,8 +211,20 @@ export function agora() {
   return new Date().toISOString();
 }
 
+/**
+ * Avisado a cada escrita. Existe para o cofre (src/cofre.js) saber que ha algo
+ * novo para guardar sem que este arquivo precise conhece-lo — db.js e o pedaco
+ * mais baixo do sistema e nao deveria depender de nada acima dele.
+ */
+let aoEscrever = null;
+
+export function avisarEscritas(fn) {
+  aoEscrever = fn;
+}
+
 export function run(sql, ...params) {
   const info = db.prepare(sql).run(...params);
+  aoEscrever?.();
   return { changes: Number(info.changes), id: Number(info.lastInsertRowid) };
 }
 

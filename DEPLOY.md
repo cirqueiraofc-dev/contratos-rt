@@ -83,6 +83,10 @@ não tem backup automático no plano starter.
 | ------------ | --------------------------------------------------------------------- |
 | `APP_SENHA`  | Senha de acesso. **Sempre defina** quando publicar na internet.         |
 | `APP_USUARIO`| Nome de usuário exigido no login. Em branco = qualquer nome serve.      |
+| `R2_CONTA`   | Id da conta na Cloudflare. Sem as quatro do R2, os dados somem a cada deploy. |
+| `R2_BALDE`   | Nome do bucket no R2 (ex.: `contratos-rt`).                            |
+| `R2_CHAVE_ID`| Access Key Id do token do R2.                                          |
+| `R2_CHAVE_SECRETA` | Secret Access Key do token do R2.                                |
 | `DATA_DIR`   | Pasta do banco. No Render, dentro do disco montado.                    |
 | `UPLOAD_DIR` | Pasta dos PDFs. No Render, dentro do disco montado.                    |
 | `PORT`       | Porta. O Render define sozinho, não mexa.                              |
