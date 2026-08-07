@@ -121,7 +121,8 @@ contratos-rt/
 ├── render-producao.yaml       # deploy Render — versão paga, com disco persistente
 ├── DEPLOY.md                  # passo a passo de publicação e de migração para o pago
 ├── src/
-│   ├── aplicacao.js           # Express, senha, rota /saude
+│   ├── aplicacao.js           # Express, porteira de acesso, rota /saude
+│   ├── sessao.js              # cookie de sessão assinado
 │   ├── db.js                  # esquema SQLite e migrações
 │   ├── servico.js             # regras: situação das RTs, pendências, alertas, recálculo por aditivo
 │   ├── disciplinas.js         # as 4 modalidades e os termos que as identificam (com peso)
@@ -209,10 +210,15 @@ Só a senha vale. Quem acessa pode digitar qualquer coisa no campo de usuário. 
 em que senha contendo `:` nunca funcionaria (o cabeçalho Basic é `usuario:senha`, e o código
 quebrava em todos os `:`). A comparação é feita em tempo constante.
 
-Existe uma tela de entrada pronta em `public/login.html`, com a marca em partículas, mas ela ainda
-é inerte: a rota `/entrar` não existe. Ligá-la significa trocar o Basic por sessão em cookie e
-reescrever `testes/acesso.test.mjs` — mudança que só deve ser publicada com os testes rodados, sob
-pena de trancar a cliente do lado de fora do próprio sistema.
+A porta de entrada é `public/login.html`, e ela é de verdade: o formulário posta em `/entrar`, que
+confere a senha e devolve um cookie assinado (`src/sessao.js`). Não há banco de sessões - o cookie
+carrega a própria validade e um HMAC dela feito com a senha, então trocar a `APP_SENHA` derruba
+todas as sessões emitidas antes.
+
+O Basic continua aceito, para chamar a API de fora do navegador sem inventar um segundo segredo.
+A tela de entrada e o que ela carrega (`/css/`, `/imagens/`, `/fontes/`) respondem antes da
+porteira, senão o visitante veria um formulário sem estilo; nada sob `/api` está nesse conjunto.
+Há um `Sair` no rodapé da barra lateral.
 
 ### 6.6 As fontes são hospedadas junto, não vêm de CDN
 
@@ -225,9 +231,14 @@ As fontes da Apple (SF Pro, SF Symbols) **não podem ser embutidas** — a licen
 desenvolvimento para plataformas Apple. Por isso `--fonte-marca` pede `SF Pro Rounded` primeiro:
 em aparelho da Apple o próprio sistema fornece, o que é permitido; nos demais cai na Nunito.
 
-A marca em partículas do login copia o desenho da fonte para decidir onde cada ponto vai, então ela
-pede a fonte explicitamente antes de desenhar. `document.fonts.ready` sozinho não basta: ele espera
-o que já foi pedido, e com `font-display: swap` a fonte da marca pode nem ter sido requisitada.
+A tela de entrada é a arte da própria ECOART em tela cheia, e o cartão cai no vazio claro que a arte
+deixa à esquerda, embaixo da marca. Quem pinta é `background: cover` ancorado à esquerda - o corte
+come pela direita, onde só há foto. Uma segunda caixa, invisível, repete esse retângulo em geometria
+e serve de sistema de coordenadas: o cartão é posicionado em porcentagem da arte, não em margem
+chutada, e por isso acompanha qualquer tamanho de janela. Abaixo de 760px a arte sai de cena.
+
+A marca da barra lateral (`public/imagens/marca-ecoart*.svg`) foi traçada dessa mesma arte, com o
+`SOLUÇÕES` dentro do vetor - não remontado em texto espaçado.
 
 ---
 
