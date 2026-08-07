@@ -11,34 +11,47 @@
   padding: 24px;
   position: relative;
   isolation: isolate;
-
-  /* Fundo de papel de projeto: a malha fina de desenho tecnico, com dois
-     claroes nas cores da marca por cima. E tudo CSS — nenhuma imagem para
-     baixar, nada que dependa de rede, e nitido em qualquer tela.
-     A malha e discreta de proposito: quem chega aqui vem digitar uma senha,
-     nao admirar o fundo. */
-  background:
-    radial-gradient(900px 520px at 12% 4%, color-mix(in srgb, var(--marca-indigo) 16%, transparent), transparent 68%),
-    radial-gradient(760px 460px at 92% 96%, color-mix(in srgb, var(--marca-laranja) 14%, transparent), transparent 68%),
-    var(--fundo);
+  /* a camada da foto transborda 20px para o desfoque nao clarear nas beiradas;
+     sem isto o transbordo vira barra de rolagem */
+  overflow: hidden;
+  /* o indigo da marca e o piso: se a foto demorar ou falhar, a tela ja esta
+     escura e tudo por cima continua legivel */
+  background: #2c244a;
+  /* nao clarear o texto aqui: a cor desceria para dentro do cartao, que e
+     branco, e sumiria com o titulo. Quem precisa clarear pede por si (abaixo) */
 }
 
-/* a malha vai numa camada propria para poder desbotar nas bordas sem mexer
-   nos claroes coloridos */
+/* Palco montado ao fundo — a ECOART trabalha com eventos, e e disso que a
+   tela fala. Tratada para virar clima e nao assunto: desfocada, meio
+   dessaturada e coberta pelo indigo da marca. Foto nitida atras de um campo de
+   senha atrapalha quem digita; assim ela ambienta sem disputar atencao.
+   Fonte: Unsplash, licenca livre para uso comercial (foto de Elijah Ekdahl).
+   O tratamento e todo em CSS — o arquivo guardado e a foto original. */
 .tela-entrada::before {
+  content: '';
+  position: absolute; inset: -20px; z-index: -2;
+  background: url('/imagens/fundo-entrada.jpg') center / cover no-repeat;
+  filter: blur(7px) grayscale(.55);
+  opacity: .42;
+  pointer-events: none;
+}
+
+/* malha de papel de projeto por cima da foto, bem discreta, apagando no centro
+   onde ficam a marca e o cartao */
+.tela-entrada::after {
   content: '';
   position: absolute; inset: 0; z-index: -1;
   background-image:
-    linear-gradient(to right, color-mix(in srgb, var(--marca-indigo) 12%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--marca-indigo) 12%, transparent) 1px, transparent 1px),
-    linear-gradient(to right, color-mix(in srgb, var(--marca-indigo) 6%, transparent) 1px, transparent 1px),
-    linear-gradient(to bottom, color-mix(in srgb, var(--marca-indigo) 6%, transparent) 1px, transparent 1px);
-  background-size: 128px 128px, 128px 128px, 32px 32px, 32px 32px;
-  /* apaga a malha no centro, onde ficam a marca e o cartao */
-  -webkit-mask-image: radial-gradient(120% 90% at 50% 45%, transparent 20%, #000 85%);
-  mask-image: radial-gradient(120% 90% at 50% 45%, transparent 20%, #000 85%);
+    linear-gradient(to right, rgba(255, 255, 255, .07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, .07) 1px, transparent 1px);
+  background-size: 46px 46px;
+  -webkit-mask-image: radial-gradient(120% 90% at 50% 45%, transparent 22%, #000 88%);
+  mask-image: radial-gradient(120% 90% at 50% 45%, transparent 22%, #000 88%);
   pointer-events: none;
 }
+
+/* sobre o fundo escuro, o texto solto fora do cartao clareia */
+.tela-entrada .entrada-aviso { color: rgba(236, 234, 244, .62); }
 
 .entrada { width: 100%; max-width: 940px; }
 

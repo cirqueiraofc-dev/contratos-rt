@@ -34,7 +34,7 @@ const passoPara = (tamanho) => Math.min(3, Math.max(2, Math.round(tamanho / 90))
 /* Raio do vazio que o ponteiro abre. Grande demais, o buraco engole uma letra
    inteira e a marca fica ilegivel enquanto o mouse passa; pequeno, ele cava um
    sulco que se ve atravessar as letras. */
-const raioPara = (tamanho) => Math.max(30, Math.round(tamanho * 0.42));
+const raioPara = (tamanho) => Math.max(14, Math.round(tamanho * 0.17));
 const ladoPara = (tamanho) => Math.max(1.6, tamanho / 30);
 
 function reduzirMovimento() {
