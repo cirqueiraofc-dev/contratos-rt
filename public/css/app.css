@@ -216,11 +216,16 @@ p { margin: 0 0 .6em; }
 }
 .marca-logo .eco { color: var(--marca-laranja); }
 .marca-logo .art { color: var(--marca-indigo); }
-/* em vez de px: cresce junto com a marca, seja qual for o tamanho dela */
+/* Em `em`, para crescer junto com a marca.
+   O espacamento entre letras e o que decide o tamanho aqui: as duas linhas
+   tem a mesma largura, entao esticar mais as letras obriga a fonte a encolher.
+   Com .44em (o valor da logo original, pensado para uma marca pequena) o
+   SOLUCOES virava um fio de cabelo embaixo de uma marca de 88px. Menos
+   espacamento devolve corpo a palavra e mantem o ar de caixa-alta espacada. */
 .marca-logo .solucoes {
-  display: block; margin-top: .08em;
-  color: var(--marca-cinza); font-size: .0946em; font-weight: 600;
-  letter-spacing: .44em; text-indent: .44em;
+  display: block; margin-top: .1em;
+  color: var(--marca-cinza); font-size: .18em; font-weight: 600;
+  letter-spacing: .19em; text-indent: .19em;
 }
 .marca-sistema {
   margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--borda);
