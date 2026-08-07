@@ -44,12 +44,30 @@ test('a rota de saúde responde sem senha e não devolve dado nenhum', async () 
   assert.deepEqual(await resposta.json(), { ok: true });
 });
 
-test('sem senha, o sistema não abre', async () => {
-  for (const caminho of ['/', '/api/painel', '/api/contratos']) {
+test('sem senha, a API não abre', async () => {
+  for (const caminho of ['/api/painel', '/api/contratos']) {
     const resposta = await fetch(url + caminho);
     assert.equal(resposta.status, 401, `${caminho} deveria exigir senha`);
     assert.match(resposta.headers.get('www-authenticate') ?? '', /Basic/);
   }
+});
+
+test('sem senha, o navegador é levado para a tela de entrada', async () => {
+  for (const caminho of ['/', '/index.html', '/qualquer-coisa']) {
+    const resposta = await fetch(url + caminho, { redirect: 'manual' });
+    assert.equal(resposta.status, 303, `${caminho} deveria mandar para a entrada`);
+    assert.equal(resposta.headers.get('location'), '/login.html');
+  }
+});
+
+test('a tela de entrada e o que ela carrega abrem sem senha', async () => {
+  // se isto quebrar, o visitante vê um formulário sem estilo e sem marca
+  for (const caminho of ['/login.html', '/css/login.css', '/css/app.css',
+                         '/imagens/marca-ecoart.svg']) {
+    const resposta = await fetch(url + caminho);
+    assert.equal(resposta.status, 200, `${caminho} deveria abrir`);
+  }
+  assert.match(await (await fetch(`${url}/login.html`)).text(), /Contratos e RT/);
 });
 
 test('senha errada continua barrada', async () => {
@@ -77,4 +95,81 @@ test('o usuário é ignorado: só a senha vale', async () => {
     });
     assert.equal(resposta.status, 200, `usuário "${usuario}" deveria entrar`);
   }
+});
+
+// ------------------------------------------------------------ entrar/sair
+
+/** Faz o caminho do formulário e devolve o cookie que o servidor mandou. */
+async function entrar(comQue) {
+  const resposta = await fetch(`${url}/entrar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ usuario: 'quem quer que seja', senha: comQue }),
+    redirect: 'manual',
+  });
+  return { resposta, cookie: (resposta.headers.get('set-cookie') ?? '').split(';')[0] };
+}
+
+test('o formulário com a senha certa abre a porta e guarda a sessão', async () => {
+  const { resposta, cookie } = await entrar(SENHA);
+  assert.equal(resposta.status, 303);
+  assert.equal(resposta.headers.get('location'), '/');
+
+  const bruto = resposta.headers.get('set-cookie') ?? '';
+  assert.match(bruto, /^sessao=/);
+  assert.match(bruto, /HttpOnly/);
+  assert.match(bruto, /SameSite=Lax/);
+
+  const painel = await fetch(`${url}/api/painel`, { headers: { Cookie: cookie } });
+  assert.equal(painel.status, 200);
+
+  const pagina = await fetch(url, { headers: { Cookie: cookie } });
+  assert.equal(pagina.status, 200);
+  assert.match(await pagina.text(), /Contratos e RT/);
+});
+
+test('o formulário com a senha errada volta para a entrada avisando', async () => {
+  for (const tentativa of ['', 'outra-coisa', 'Obra:2026#Ribeirão ']) {
+    const { resposta, cookie } = await entrar(tentativa);
+    assert.equal(resposta.status, 303);
+    assert.equal(resposta.headers.get('location'), '/login.html?erro=1');
+    assert.equal(cookie, '', `"${tentativa}" não deveria receber sessão`);
+  }
+});
+
+test('cookie adulterado não vale — nem o prazo, nem a assinatura', async () => {
+  const { cookie } = await entrar(SENHA);
+  const [, valor] = cookie.split('=');
+  const [ate, marca] = valor.split('.');
+
+  const falsos = [
+    `sessao=${Number(ate) + 1}.${marca}`,        // esticaram o prazo
+    `sessao=${ate}.${marca.slice(0, -1)}x`,      // mexeram na assinatura
+    `sessao=${ate}`,                             // tiraram a assinatura
+    'sessao=1.2',
+    'sessao=',
+  ];
+  for (const falso of falsos) {
+    const resposta = await fetch(`${url}/api/painel`, { headers: { Cookie: falso } });
+    assert.equal(resposta.status, 401, `"${falso}" não deveria entrar`);
+  }
+});
+
+test('sair apaga a sessão do navegador', async () => {
+  const { cookie } = await entrar(SENHA);
+  const saida = await fetch(`${url}/sair`, { headers: { Cookie: cookie }, redirect: 'manual' });
+  assert.equal(saida.status, 303);
+  assert.equal(saida.headers.get('location'), '/login.html');
+  assert.match(saida.headers.get('set-cookie') ?? '', /^sessao=;/);
+  assert.match(saida.headers.get('set-cookie') ?? '', /Max-Age=0/);
+});
+
+test('quem já entrou não fica preso na tela de entrada', async () => {
+  const { cookie } = await entrar(SENHA);
+  const resposta = await fetch(`${url}/login.html`, {
+    headers: { Cookie: cookie },
+    redirect: 'manual',
+  });
+  assert.equal(resposta.status, 303);
+  assert.equal(resposta.headers.get('location'), '/');
 });

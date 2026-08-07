@@ -23,6 +23,10 @@
         <p>Gestão de contratos e responsabilidades técnicas</p>
       </div>
 
+      <p class="entrada-erro" id="entrada-erro" role="alert" hidden>
+        Senha incorreta. Confira e tente de novo.
+      </p>
+
       <form class="entrada-form" method="post" action="/entrar">
         <div class="campo">
           <label for="usuario">Usuário</label>
@@ -31,7 +35,8 @@
         </div>
         <div class="campo">
           <label for="senha">Senha</label>
-          <input id="senha" name="senha" type="password" autocomplete="current-password" required />
+          <input id="senha" name="senha" type="password" autocomplete="current-password"
+                 autofocus required />
         </div>
         <button class="botao primario largo" type="submit">Entrar</button>
       </form>
@@ -42,6 +47,15 @@
       </p>
     </div>
   </main>
+
+  <script>
+    // A pagina e estatica: o servidor nao tem como escrever o erro dentro
+    // dela, entao avisa pela propria URL e quem revela e este pedaco.
+    if (new URLSearchParams(location.search).has('erro')) {
+      document.getElementById('entrada-erro').hidden = false;
+      document.getElementById('senha').focus();
+    }
+  </script>
 
 </body>
 </html>

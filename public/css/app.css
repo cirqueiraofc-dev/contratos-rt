@@ -242,7 +242,14 @@ p { margin: 0 0 .6em; }
 }
 .badge:empty { display: none; }
 
-.lateral-rodape { margin-top: auto; }
+/* O rodape da lateral encosta no fim da barra: o aviso fica em cima e o
+   "Sair" embaixo, discreto — e a saida, nao uma acao que se ofereca. */
+.lateral-rodape { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
+.lateral-sair {
+  align-self: flex-start;
+  font-size: 12px; color: var(--texto-fraco); text-decoration: none;
+}
+.lateral-sair:hover, .lateral-sair:focus-visible { color: var(--texto); }
 .lateral-rodape p {
   font-size: 11.5px; line-height: 1.5; color: var(--texto-fraco);
   background: var(--superficie-2); border: 1px solid var(--borda);

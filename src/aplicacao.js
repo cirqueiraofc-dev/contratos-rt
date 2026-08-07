@@ -4,6 +4,7 @@ import express from 'express';
 import { api } from './routes/api.js';
 import { limparTemporarios } from './arquivos.js';
 import { PUBLIC_DIR } from './paths.js';
+import { NOME_COOKIE, cookieDeEntrada, cookieDeSaida, lerCookies, valido } from './sessao.js';
 import './db.js';
 
 /**
@@ -48,14 +49,62 @@ export function criarAplicacao({ senha = '' } = {}) {
   // O usuario e ignorado de proposito — so a senha vale. Quem acessa pode
   // digitar qualquer coisa (ou nada) no campo de usuario.
   if (senha) {
-    app.use((req, res, next) => {
-      const [tipo, credencial] = (req.headers.authorization ?? '').split(' ');
-      if (tipo === 'Basic' && credencial) {
-        if (senhaConfere(extrairSenha(credencial), senha)) return next();
+    // atras do Render a conexao chega em http; quem sabe que era https e o
+    // cabecalho que o proxy poe, e disso depende marcar o cookie como Secure
+    app.set('trust proxy', 1);
+
+    const seguro = (req) => req.secure;
+
+    // A tela de entrada precisa poder se desenhar antes de alguem entrar:
+    // ela mesma, o que ela carrega e as duas rotas do formulario ficam de
+    // fora da porteira. Nada aqui e dado de contrato — e a fachada.
+    const ABERTO = /^\/(entrar|sair|login(\.html)?|css\/|imagens\/|fontes\/)/;
+
+    app.post('/entrar', express.urlencoded({ extended: false, limit: '4kb' }), (req, res) => {
+      if (!senhaConfere(req.body?.senha ?? '', senha)) {
+        return res.redirect(303, '/login.html?erro=1');
       }
-      res.setHeader('WWW-Authenticate', 'Basic realm="Contratos e RT", charset="UTF-8"');
-      return res.status(401).send('Acesso restrito.');
+      res.setHeader('Set-Cookie', cookieDeEntrada(senha, { seguro: seguro(req) }));
+      return res.redirect(303, '/');
     });
+
+    app.get('/sair', (req, res) => {
+      res.setHeader('Set-Cookie', cookieDeSaida({ seguro: seguro(req) }));
+      return res.redirect(303, '/login.html');
+    });
+
+    app.use((req, res, next) => {
+      const cookie = lerCookies(req.headers.cookie)[NOME_COOKIE];
+      if (valido(cookie, senha)) {
+        // quem ja entrou nao tem o que fazer na tela de entrada
+        if (/^\/login(\.html)?$/.test(req.path)) return res.redirect(303, '/');
+        return next();
+      }
+
+      // O Basic continua valendo: e o que serve para chamar a API de fora do
+      // navegador (um script de backup, por exemplo) sem inventar um segundo
+      // segredo so para isso.
+      const [tipo, credencial] = (req.headers.authorization ?? '').split(' ');
+      if (tipo === 'Basic' && credencial && senhaConfere(extrairSenha(credencial), senha)) {
+        return next();
+      }
+
+      if (ABERTO.test(req.path)) return next();
+
+      // Quem chegou de navegador vai ver a tela de entrada. Quem chegou pela
+      // API leva um 401 com o convite ao Basic, que e o que um script entende.
+      if (req.path.startsWith('/api/')) {
+        res.setHeader('WWW-Authenticate', 'Basic realm="Contratos e RT", charset="UTF-8"');
+        return res.status(401).json({ erro: 'Acesso restrito.' });
+      }
+      return res.redirect(303, '/login.html');
+    });
+  } else {
+    // Sem senha nao ha o que guardar, mas o formulario existe do mesmo jeito:
+    // em vez de devolver "rota nao encontrada" para quem apertar Entrar, a
+    // porta simplesmente abre.
+    app.post('/entrar', (_req, res) => res.redirect(303, '/'));
+    app.get('/sair', (_req, res) => res.redirect(303, '/'));
   }
 
   app.use(express.json({ limit: '2mb' }));
