@@ -195,21 +195,31 @@ p { margin: 0 0 .6em; }
   position: sticky;
   top: 0;
   height: 100vh;
+  /* declara a lateral como contexto de medida para o `cqw` da marca */
+  container-type: inline-size;
 }
 
 /* Marca ECOART reproduzida em texto — a logo original nao tem simbolo, e so
    "eco" laranja + "art" indigo + "SOLUÇÕES" cinza espacado. Fonte arredondada
    quando o sistema tiver uma; senao cai no padrao, que fica proximo. */
 .marca { display: flex; flex-direction: column; gap: 3px; }
+
+/* A marca ocupa a largura inteira da barra lateral. `cqw` mede a propria
+   lateral, entao ela se ajusta sozinha quando a barra muda de largura (260px,
+   292px na tela grande, largura cheia no celular) sem precisar de um tamanho
+   para cada caso. O clamp evita que fique minuscula ou absurda nos extremos. */
 .marca-logo {
   font-family: var(--fonte-marca);
-  font-size: 27px; font-weight: 700; line-height: 1; letter-spacing: -.02em;
+  font-size: clamp(30px, 35.5cqw, 96px);
+  font-weight: 700; line-height: 1; letter-spacing: -.02em;
+  display: block;
 }
 .marca-logo .eco { color: var(--marca-laranja); }
 .marca-logo .art { color: var(--marca-indigo); }
+/* em vez de px: cresce junto com a marca, seja qual for o tamanho dela */
 .marca-logo .solucoes {
-  display: block; margin-top: 3px;
-  color: var(--marca-cinza); font-size: 8.5px; font-weight: 600;
+  display: block; margin-top: .08em;
+  color: var(--marca-cinza); font-size: .0946em; font-weight: 600;
   letter-spacing: .44em; text-indent: .44em;
 }
 .marca-sistema {
