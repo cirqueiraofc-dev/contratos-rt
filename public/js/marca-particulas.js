@@ -29,13 +29,18 @@ const TETO_PARTICULAS = 30000;
    O passo e ditado pelo traco MAIS FINO do desenho, nao pelo tamanho geral. Na
    logo da ECOART o traco mais fino e o do SOLUCOES, com cerca de um nono da
    altura do "ecoart": com passo largo o L e o E perdiam a haste e a palavra
-   saia lida errada. Dai o divisor generoso e o teto de 3. */
-const passoPara = (tamanho) => Math.min(3, Math.max(2, Math.round(tamanho / 90)));
+   saia lida errada.
+
+   O ponto tem de ser pouco maior que o passo — o bastante para as bordas se
+   encostarem e o traco ficar cheio, sem virar mosaico. Com ponto muito maior
+   que o espacamento, as curvas do "e" e do "o" saem em degrau. Nesta
+   calibragem a marca da por volta de 27 mil particulas, dentro do teto. */
+const passoPara = (tamanho) => Math.max(1.15, tamanho / 92);
 /* Raio do vazio que o ponteiro abre. Grande demais, o buraco engole uma letra
    inteira e a marca fica ilegivel enquanto o mouse passa; pequeno, ele cava um
    sulco que se ve atravessar as letras. */
-const raioPara = (tamanho) => Math.max(14, Math.round(tamanho * 0.17));
-const ladoPara = (tamanho) => Math.max(1.6, tamanho / 30);
+const raioPara = (tamanho) => Math.max(7, Math.round(tamanho * 0.09));
+const ladoPara = (tamanho) => Math.max(1.4, tamanho / 73);
 
 function reduzirMovimento() {
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
@@ -79,7 +84,11 @@ function amostrar(marca, largura, altura, dpr) {
   // e a altura desenhada reduzida na mesma proporcao — assim a calibragem
   // antiga continua valendo.
   const tamanho = h * 0.45;
-  const passo = passoPara(tamanho);
+  // Numa maquina modesta, 27 mil particulas por quadro pesam. Onde o navegador
+  // diz haver poucos nucleos, o passo abre um pouco: a marca fica levemente
+  // menos fina e a animacao continua fluida — melhor que o contrario.
+  const modesta = (navigator.hardwareConcurrency ?? 8) <= 4;
+  const passo = passoPara(tamanho) * (modesta ? 1.6 : 1);
   const img = ctx.getImageData(0, 0, molde.width, molde.height);
   const dados = img.data;
 
