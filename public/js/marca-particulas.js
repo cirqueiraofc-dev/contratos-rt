@@ -24,9 +24,17 @@ const FORCA = 30;           // mouseForce do Pixel Drift
 const TETO_PARTICULAS = 30000;
 
 /* Tamanho do quadradinho e densidade acompanham a letra: numa marca grande,
-   manter o passo pequeno geraria dezenas de milhares de particulas. */
-const passoPara = (tamanho) => Math.max(2, Math.round(tamanho / 26));
-const raioPara = (tamanho) => Math.max(48, Math.round(tamanho * 0.95));
+   manter o passo pequeno geraria dezenas de milhares de particulas.
+
+   O passo e ditado pelo traco MAIS FINO do desenho, nao pelo tamanho geral. Na
+   logo da ECOART o traco mais fino e o do SOLUCOES, com cerca de um nono da
+   altura do "ecoart": com passo largo o L e o E perdiam a haste e a palavra
+   saia lida errada. Dai o divisor generoso e o teto de 3. */
+const passoPara = (tamanho) => Math.min(3, Math.max(2, Math.round(tamanho / 90)));
+/* Raio do vazio que o ponteiro abre. Grande demais, o buraco engole uma letra
+   inteira e a marca fica ilegivel enquanto o mouse passa; pequeno, ele cava um
+   sulco que se ve atravessar as letras. */
+const raioPara = (tamanho) => Math.max(30, Math.round(tamanho * 0.42));
 const ladoPara = (tamanho) => Math.max(1.6, tamanho / 30);
 
 function reduzirMovimento() {
