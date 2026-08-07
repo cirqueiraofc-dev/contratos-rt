@@ -1,9 +1,0 @@
-Give the companies a page of their own
-
-Companies were living at the top of Settings, above the backup box and
-the technical staff. That is a filing cabinet, not a page: the thing you
-open most often was buried under the thing you open least.
-
-Now they have a tab. The list, the "+ Nova empresa" button and the form
-moved out whole; Settings keeps only the backup and the responsaveis
-tecnicos, and says so in its subtitle.
