@@ -314,7 +314,7 @@ export function telaContrato(contrato, disciplinas) {
 
 /* -------------------------------------------------------- configuracoes */
 
-export function telaConfiguracoes(empresas, editandoId, profissionais, disciplinas) {
+export function telaEmpresas(empresas, editandoId) {
   // `editandoId` vazio significa formulario em branco para uma empresa nova
   const empresa = empresas.find((e) => String(e.id) === String(editandoId)) ?? {
     id: '', razao_social: '', cnpj: '', crea_empresa: '', endereco: '', cidade: '', uf: '',
@@ -322,57 +322,38 @@ export function telaConfiguracoes(empresas, editandoId, profissionais, disciplin
   };
   const nova = !empresa.id;
 
-  const listaEmpresas = `
-    <table class="tabela">
-      <thead><tr><th>Razão social</th><th>CNPJ</th><th>Registro</th><th>Contratos</th><th></th></tr></thead>
-      <tbody>${empresas.map((e) => `
-        <tr${String(e.id) === String(empresa.id) ? ' class="linha-ativa"' : ''}>
-          <td><strong>${escapar(e.razao_social || 'Empresa sem nome')}</strong></td>
-          <td>${escapar(e.cnpj || '—')}</td>
-          <td>${escapar(e.crea_empresa || '—')}</td>
-          <td>${e.total_contratos ?? 0}</td>
-          <td style="text-align:right;white-space:nowrap">
-            <button class="botao pequeno" data-editar-empresa="${e.id}">Editar</button>
-            ${empresas.length > 1 && !e.total_contratos
-              ? `<button class="botao pequeno perigo" data-remover-empresa="${e.id}">Excluir</button>`
-              : ''}
-          </td>
-        </tr>`).join('')}</tbody>
-    </table>`;
-
-  const listaProfissionais = profissionais.length
-    ? `<table class="tabela">
-         <thead><tr><th>Nome</th><th>Título</th><th>Registro</th><th>Modalidades</th><th></th></tr></thead>
-         <tbody>${profissionais.map((p) => `
-           <tr>
-             <td><strong>${escapar(p.nome)}</strong></td>
-             <td>${escapar(p.titulo || '—')}</td>
-             <td>${escapar(p.crea || '—')}${p.rnp ? `<br><small>RNP ${escapar(p.rnp)}</small>` : ''}</td>
-             <td>${p.disciplinas.map((d) => etiqueta(disciplinas.find((x) => x.id === d)?.nome ?? d, 'acento')).join(' ') || '—'}</td>
-             <td style="text-align:right"><button class="botao pequeno perigo" data-remover-profissional="${p.id}">Remover</button></td>
-           </tr>`).join('')}</tbody>
-       </table>`
-    : '<div class="vazio">Nenhum responsável técnico cadastrado.</div>';
-
   return `
     <div class="cabecalho-tela">
       <div>
-        <h1>Configurações</h1>
-        <p>Empresas, responsáveis técnicos e a cópia de segurança</p>
+        <h1>Empresas</h1>
+        <p>Quem assina como contratada — é o CNPJ e o registro delas que saem nos documentos</p>
+      </div>
+      <div class="cabecalho-acoes">
+        <button class="botao primario" data-editar-empresa="">+ Nova empresa</button>
       </div>
     </div>
 
     <div class="cartao">
-      <div class="cartao-titulo">
-        <h2>Empresas</h2>
-        <button class="botao pequeno" data-editar-empresa="">Adicionar empresa</button>
-      </div>
-      <p>
-        Cada contrato pertence a uma destas empresas, e é o CNPJ e o registro dela
-        que saem no atestado e no requerimento. Troque de empresa pelo seletor no
-        alto da barra lateral.
+      <table class="tabela">
+        <thead><tr><th>Razão social</th><th>CNPJ</th><th>Registro</th><th>Contratos</th><th></th></tr></thead>
+        <tbody>${empresas.map((e) => `
+          <tr${String(e.id) === String(empresa.id) ? ' class="linha-ativa"' : ''}>
+            <td><strong>${escapar(e.razao_social || 'Empresa sem nome')}</strong></td>
+            <td>${escapar(e.cnpj || '—')}</td>
+            <td>${escapar(e.crea_empresa || '—')}</td>
+            <td>${e.total_contratos ?? 0}</td>
+            <td style="text-align:right;white-space:nowrap">
+              <button class="botao pequeno" data-editar-empresa="${e.id}">Editar</button>
+              ${empresas.length > 1 && !e.total_contratos
+                ? `<button class="botao pequeno perigo" data-remover-empresa="${e.id}">Excluir</button>`
+                : ''}
+            </td>
+          </tr>`).join('')}</tbody>
+      </table>
+      <p style="margin:14px 0 0;font-size:12.5px;color:var(--texto-fraco)">
+        Cada contrato pertence a uma destas empresas. Troque de empresa pelo seletor no alto da
+        barra lateral; empresa com contrato só pode ser excluída depois de esvaziada.
       </p>
-      ${listaEmpresas}
     </div>
 
     <div class="cartao">
@@ -394,6 +375,32 @@ export function telaConfiguracoes(empresas, editandoId, profissionais, disciplin
         </div>
         <button class="botao primario" type="submit">${nova ? 'Cadastrar empresa' : 'Salvar dados da empresa'}</button>
       </form>
+    </div>`;
+}
+
+/* -------------------------------------------------------- configuracoes */
+
+export function telaConfiguracoes(profissionais, disciplinas) {
+  const listaProfissionais = profissionais.length
+    ? `<table class="tabela">
+         <thead><tr><th>Nome</th><th>Título</th><th>Registro</th><th>Modalidades</th><th></th></tr></thead>
+         <tbody>${profissionais.map((p) => `
+           <tr>
+             <td><strong>${escapar(p.nome)}</strong></td>
+             <td>${escapar(p.titulo || '—')}</td>
+             <td>${escapar(p.crea || '—')}${p.rnp ? `<br><small>RNP ${escapar(p.rnp)}</small>` : ''}</td>
+             <td>${p.disciplinas.map((d) => etiqueta(disciplinas.find((x) => x.id === d)?.nome ?? d, 'acento')).join(' ') || '—'}</td>
+             <td style="text-align:right"><button class="botao pequeno perigo" data-remover-profissional="${p.id}">Remover</button></td>
+           </tr>`).join('')}</tbody>
+       </table>`
+    : '<div class="vazio">Nenhum responsável técnico cadastrado.</div>';
+
+  return `
+    <div class="cabecalho-tela">
+      <div>
+        <h1>Configurações</h1>
+        <p>Responsáveis técnicos e a cópia de segurança</p>
+      </div>
     </div>
 
     <div class="cartao">

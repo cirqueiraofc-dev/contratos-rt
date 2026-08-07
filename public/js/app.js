@@ -1,5 +1,5 @@
 import { api, empresaEmUso, usarEmpresa } from './api.js';
-import { telaConfiguracoes, telaContrato, telaContratos, telaPainel } from './telas.js';
+import { telaConfiguracoes, telaContrato, telaContratos, telaEmpresas, telaPainel } from './telas.js';
 import {
   fluxoConcluir, fluxoEditarContrato, fluxoEditarRt, fluxoImportarArt, fluxoNovoContrato,
   fluxoRegistrarAditivo,
@@ -41,6 +41,9 @@ async function navegar() {
     if (partes[0] === 'contrato' && partes[1]) {
       marcarMenu('contratos');
       await mostrarContrato(Number(partes[1]));
+    } else if (partes[0] === 'empresas') {
+      marcarMenu('empresas');
+      await mostrarEmpresas();
     } else if (partes[0] === 'contratos') {
       marcarMenu('contratos');
       await mostrarContratos({ status: params.get('status') ?? '', q: params.get('q') ?? '' });
@@ -211,10 +214,19 @@ async function carregarHistorico(id) {
  * trocava um formulario vazio por outro formulario vazio — clique sem resposta
  * nenhuma. Botao que nao responde e botao quebrado, mesmo funcionando.
  */
-async function mostrarConfiguracoes(editandoId = empresaEmUso(), vindoDeClique = false) {
-  const [lista, profissionais] = await Promise.all([api.empresas(), api.profissionais()]);
-  empresas = lista;
-  conteudo.innerHTML = telaConfiguracoes(empresas, editandoId, profissionais, disciplinas);
+/**
+ * @param editandoId qual empresa carregar no formulario; vazio abre em branco
+ * @param vindoDeClique leva ate o formulario e poe o cursor nele
+ *
+ * O segundo parametro existe porque sem ele os botoes pareciam quebrados: o
+ * formulario fica abaixo da lista, e trocar de empresa nao mexe em nada perto
+ * de onde a pessoa clicou. Com a lista de uma empresa so, em branco, "Nova
+ * empresa" trocava um formulario vazio por outro formulario vazio — clique sem
+ * resposta nenhuma. Botao que nao responde e botao quebrado, mesmo funcionando.
+ */
+async function mostrarEmpresas(editandoId = empresaEmUso(), vindoDeClique = false) {
+  empresas = await api.empresas();
+  conteudo.innerHTML = telaEmpresas(empresas, editandoId);
 
   const formulario = $('#form-empresa');
   formulario.addEventListener('submit', async (ev) => {
@@ -228,7 +240,7 @@ async function mostrarConfiguracoes(editandoId = empresaEmUso(), vindoDeClique =
       // empresa recem-criada ja entra aberta: e o que quem cadastrou espera
       if (!id) escolherEmpresa(salvo.id);
       await recarregarEmpresas();
-      await mostrarConfiguracoes(salvo.id, true);
+      await mostrarEmpresas(salvo.id, true);
     } catch (erro) {
       aviso(erro.message, 'erro');
     }
@@ -237,7 +249,7 @@ async function mostrarConfiguracoes(editandoId = empresaEmUso(), vindoDeClique =
   if (vindoDeClique) levarAoFormulario(formulario);
 
   for (const botao of $$('[data-editar-empresa]', conteudo)) {
-    botao.addEventListener('click', () => mostrarConfiguracoes(botao.dataset.editarEmpresa, true));
+    botao.addEventListener('click', () => mostrarEmpresas(botao.dataset.editarEmpresa, true));
   }
 
   for (const botao of $$('[data-remover-empresa]', conteudo)) {
@@ -249,12 +261,17 @@ async function mostrarConfiguracoes(editandoId = empresaEmUso(), vindoDeClique =
         if (String(empresaEmUso()) === botao.dataset.removerEmpresa) escolherEmpresa(null);
         await recarregarEmpresas();
         aviso('Empresa excluída.', 'sucesso');
-        await mostrarConfiguracoes();
+        await mostrarEmpresas();
       } catch (erro) {
         aviso(erro.message, 'erro');
       }
     });
   }
+}
+
+async function mostrarConfiguracoes() {
+  const profissionais = await api.profissionais();
+  conteudo.innerHTML = telaConfiguracoes(profissionais, disciplinas);
 
   $('#baixar-backup').addEventListener('click', async (ev) => {
     const botao = ev.currentTarget;
@@ -303,6 +320,7 @@ async function mostrarConfiguracoes(editandoId = empresaEmUso(), vindoDeClique =
       escolherEmpresa(null);
       await recarregarEmpresas();
       await mostrarConfiguracoes();
+      await atualizarBadge();
     } catch (erro) {
       aviso(erro.message, 'erro');
       botao.disabled = false;
