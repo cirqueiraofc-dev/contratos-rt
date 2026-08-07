@@ -18,22 +18,26 @@
 
 .entrada {
   width: 100%;
-  max-width: 460px;
+  /* largo por causa da marca; o cartao continua estreito, centralizado nela */
+  max-width: 780px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 34px;
 }
 
-/* a marca fica acima do cartao, com largura propria — maior que ele */
+/* A marca domina a tela: e a porta da empresa, e o cartao e so o formulario.
+   Larga o quanto a tela deixar, com teto para nao ficar absurda em monitor
+   ultralargo. */
 .entrada-marca {
   display: block;
-  width: min(430px, 82vw);
+  width: min(720px, 88vw);
   height: auto;
 }
 
 .entrada-cartao {
   width: 100%;
+  max-width: 460px;
   background: #fff;
   border-radius: 16px;
   box-shadow: 0 24px 60px rgba(20, 14, 40, .32);

@@ -183,12 +183,12 @@ p { margin: 0 0 .6em; }
 
 /* ------------------------------------------------------------- estrutura */
 
-.app { display: grid; grid-template-columns: 264px 1fr; min-height: 100vh; }
+.app { display: grid; grid-template-columns: 300px 1fr; min-height: 100vh; }
 
 .lateral {
   background: var(--superficie);
   border-right: 1px solid var(--borda);
-  padding: 22px 18px;
+  padding: 22px 14px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -623,8 +623,8 @@ a.sub:hover { color: var(--acento); }
    um pouco e os cartoes respiram, em vez de tudo ficar miudo no canto. */
 @media (min-width: 1500px) {
   body { font-size: 15.5px; }
-  .app { grid-template-columns: 292px 1fr; }
-  .lateral { padding: 26px 22px; }
+  .app { grid-template-columns: 336px 1fr; }
+  .lateral { padding: 26px 18px; }
   .conteudo { padding: 38px 46px 80px; }
   .cabecalho-tela h1 { font-size: 28px; }
   .cabecalho-tela { margin-bottom: 28px; }
