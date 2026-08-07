@@ -8,18 +8,19 @@ import { NOME_COOKIE, cookieDeEntrada, cookieDeSaida, lerCookies, valido } from 
 import './db.js';
 
 /**
- * Le a senha de um cabecalho Basic. O formato e "usuario:senha", e so o
- * primeiro dois-pontos separa — senha com ":" dentro continua valendo inteira.
+ * Le um cabecalho Basic. O formato e "usuario:senha", e so o primeiro
+ * dois-pontos separa — senha com ":" dentro continua valendo inteira.
  */
-function extrairSenha(credencial) {
+function lerBasic(credencial) {
   let bruto;
   try {
     bruto = Buffer.from(credencial, 'base64').toString('utf8');
   } catch {
-    return '';
+    return { usuario: '', senha: '' };
   }
   const separador = bruto.indexOf(':');
-  return separador === -1 ? '' : bruto.slice(separador + 1);
+  if (separador === -1) return { usuario: bruto, senha: '' };
+  return { usuario: bruto.slice(0, separador), senha: bruto.slice(separador + 1) };
 }
 
 /** Comparacao de tempo constante, para nao vazar a senha pelo tempo de resposta. */
@@ -31,10 +32,28 @@ function senhaConfere(informada, esperada) {
 }
 
 /**
+ * O usuario nao e segredo — e um nome, nao uma senha. Por isso a comparacao
+ * aqui e a comum, e perdoa o que o teclado faz sem pedir licenca: espaco
+ * sobrando e maiuscula no comeco.
+ *
+ * Sem APP_USUARIO definido, qualquer nome passa. E o comportamento que o
+ * sistema sempre teve, e quem so definiu a senha continua entrando igual.
+ */
+function usuarioConfere(informado, esperado) {
+  if (!esperado) return true;
+  return String(informado ?? '').trim().toLocaleLowerCase('pt-BR')
+    === String(esperado).trim().toLocaleLowerCase('pt-BR');
+}
+
+/**
  * Monta a aplicacao Express. Separado de server.js para que os testes possam
  * subir a mesma aplicacao numa porta efemera.
  */
-export function criarAplicacao({ senha = '' } = {}) {
+export function criarAplicacao({ senha = '', usuario = '' } = {}) {
+  // O que assina a sessao e o par inteiro. Trocar o usuario derruba as
+  // sessoes abertas do mesmo jeito que trocar a senha — que e o esperado de
+  // quem acabou de mudar quem pode entrar.
+  const segredo = `${usuario}\n${senha}`;
   const app = express();
   app.disable('x-powered-by');
 
@@ -61,10 +80,13 @@ export function criarAplicacao({ senha = '' } = {}) {
     const ABERTO = /^\/(entrar|sair|login(\.html)?|css\/|imagens\/|fontes\/)/;
 
     app.post('/entrar', express.urlencoded({ extended: false, limit: '4kb' }), (req, res) => {
-      if (!senhaConfere(req.body?.senha ?? '', senha)) {
-        return res.redirect(303, '/login.html?erro=1');
-      }
-      res.setHeader('Set-Cookie', cookieDeEntrada(senha, { seguro: seguro(req) }));
+      // as duas conferencias antes do `if`: assim errar o usuario e errar a
+      // senha custam o mesmo tempo, e o relogio nao conta qual dos dois foi
+      const nomeOk = usuarioConfere(req.body?.usuario, usuario);
+      const senhaOk = senhaConfere(req.body?.senha ?? '', senha);
+      if (!nomeOk || !senhaOk) return res.redirect(303, '/login.html?erro=1');
+
+      res.setHeader('Set-Cookie', cookieDeEntrada(segredo, { seguro: seguro(req) }));
       return res.redirect(303, '/');
     });
 
@@ -75,7 +97,7 @@ export function criarAplicacao({ senha = '' } = {}) {
 
     app.use((req, res, next) => {
       const cookie = lerCookies(req.headers.cookie)[NOME_COOKIE];
-      if (valido(cookie, senha)) {
+      if (valido(cookie, segredo)) {
         // quem ja entrou nao tem o que fazer na tela de entrada
         if (/^\/login(\.html)?$/.test(req.path)) return res.redirect(303, '/');
         return next();
@@ -85,8 +107,11 @@ export function criarAplicacao({ senha = '' } = {}) {
       // navegador (um script de backup, por exemplo) sem inventar um segundo
       // segredo so para isso.
       const [tipo, credencial] = (req.headers.authorization ?? '').split(' ');
-      if (tipo === 'Basic' && credencial && senhaConfere(extrairSenha(credencial), senha)) {
-        return next();
+      if (tipo === 'Basic' && credencial) {
+        const dito = lerBasic(credencial);
+        if (usuarioConfere(dito.usuario, usuario) && senhaConfere(dito.senha, senha)) {
+          return next();
+        }
       }
 
       if (ABERTO.test(req.path)) return next();

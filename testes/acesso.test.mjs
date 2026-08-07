@@ -18,11 +18,14 @@ const { fecharBanco } = await import('../src/db.js');
 // dois-pontos e acento de proposito: sao os casos que quebram uma leitura
 // ingenua do cabecalho Basic, e senha de gente de verdade tem disso
 const SENHA = 'Obra:2026#Ribeirão';
+// nome inventado de proposito: o repositorio e publico, e o usuario de
+// verdade mora na APP_USUARIO do painel do Render, nao aqui
+const USUARIO = 'engenharia';
 let servidor;
 let url;
 
 before(async () => {
-  servidor = criarAplicacao({ senha: SENHA }).listen(0);
+  servidor = criarAplicacao({ senha: SENHA, usuario: USUARIO }).listen(0);
   await new Promise((resolve) => servidor.once('listening', resolve));
   url = `http://127.0.0.1:${servidor.address().port}`;
 });
@@ -34,8 +37,10 @@ after(async () => {
   fs.rmSync(base, { recursive: true, force: true, maxRetries: 5, retryDelay: 60 });
 });
 
-const comSenha = (senha) => ({
-  headers: { Authorization: `Basic ${Buffer.from(`:${senha}`, 'utf8').toString('base64')}` },
+const comSenha = (senha, usuario = USUARIO) => ({
+  headers: {
+    Authorization: `Basic ${Buffer.from(`${usuario}:${senha}`, 'utf8').toString('base64')}`,
+  },
 });
 
 test('a rota de saúde responde sem senha e não devolve dado nenhum', async () => {
@@ -87,13 +92,32 @@ test('com a senha certa, o sistema abre', async () => {
   assert.equal((await painel.json()).indicadores.contratos_ativos, 0);
 });
 
-test('o usuário é ignorado: só a senha vale', async () => {
-  for (const usuario of ['', 'adm', 'admin', 'joão', 'qualquer coisa']) {
-    const credencial = Buffer.from(`${usuario}:${SENHA}`, 'utf8').toString('base64');
-    const resposta = await fetch(`${url}/api/painel`, {
-      headers: { Authorization: `Basic ${credencial}` },
-    });
-    assert.equal(resposta.status, 200, `usuário "${usuario}" deveria entrar`);
+test('o usuário também é conferido, e perdoa caixa e espaço', async () => {
+  for (const jeito of [USUARIO, 'Engenharia', 'ENGENHARIA', '  engenharia  ']) {
+    const resposta = await fetch(`${url}/api/painel`, comSenha(SENHA, jeito));
+    assert.equal(resposta.status, 200, `"${jeito}" deveria entrar`);
+  }
+  for (const errado of ['', 'adm', 'engenhari', 'enge nharia', 'engenharia2']) {
+    const resposta = await fetch(`${url}/api/painel`, comSenha(SENHA, errado));
+    assert.equal(resposta.status, 401, `"${errado}" não deveria entrar`);
+  }
+});
+
+test('sem APP_USUARIO, qualquer nome continua servindo', async () => {
+  // é como o sistema sempre funcionou; quem só definiu a senha não quebra
+  const solto = criarAplicacao({ senha: SENHA }).listen(0);
+  await new Promise((r) => solto.once('listening', r));
+  const outra = `http://127.0.0.1:${solto.address().port}`;
+  try {
+    for (const nome of ['', 'adm', 'joão', 'qualquer coisa']) {
+      const credencial = Buffer.from(`${nome}:${SENHA}`, 'utf8').toString('base64');
+      const resposta = await fetch(`${outra}/api/painel`, {
+        headers: { Authorization: `Basic ${credencial}` },
+      });
+      assert.equal(resposta.status, 200, `"${nome}" deveria entrar`);
+    }
+  } finally {
+    await new Promise((r) => solto.close(r));
   }
 });
 
@@ -104,7 +128,7 @@ async function entrar(comQue) {
   const resposta = await fetch(`${url}/entrar`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ usuario: 'quem quer que seja', senha: comQue }),
+    body: new URLSearchParams({ usuario: USUARIO, senha: comQue }),
     redirect: 'manual',
   });
   return { resposta, cookie: (resposta.headers.get('set-cookie') ?? '').split(';')[0] };
@@ -172,4 +196,32 @@ test('quem já entrou não fica preso na tela de entrada', async () => {
   });
   assert.equal(resposta.status, 303);
   assert.equal(resposta.headers.get('location'), '/');
+});
+
+test('o formulário com o usuário errado não abre a porta', async () => {
+  for (const nome of ['', 'adm', 'sabrina', 'outra pessoa']) {
+    const resposta = await fetch(`${url}/entrar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ usuario: nome, senha: SENHA }),
+      redirect: 'manual',
+    });
+    assert.equal(resposta.headers.get('location'), '/login.html?erro=1', `"${nome}" entrou`);
+    assert.equal(resposta.headers.get('set-cookie'), null);
+  }
+});
+
+test('sessão emitida com um usuário não vale para outro', async () => {
+  // trocar quem entra tem que derrubar quem já estava dentro
+  const { cookie } = await entrar(SENHA);
+  const outro = criarAplicacao({ senha: SENHA, usuario: 'outronome' }).listen(0);
+  await new Promise((r) => outro.once('listening', r));
+  try {
+    const resposta = await fetch(`http://127.0.0.1:${outro.address().port}/api/painel`, {
+      headers: { Cookie: cookie },
+    });
+    assert.equal(resposta.status, 401);
+  } finally {
+    await new Promise((r) => outro.close(r));
+  }
 });

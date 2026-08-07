@@ -38,7 +38,7 @@ o desenvolvimento é feito por Cirqueira (`cirqueiraofc-dev`).
 | Serviço no Render | `contratos-rt` — instância **gratuita**, sem disco |
 | Blueprint do Render | ID `exs-d9ov3lb7uimc73a9a6bg` |
 | Região | Virginia (mais próxima do Brasil; o Render não tem data center na América do Sul) |
-| Acesso ao sistema | Usuário **em branco**, senha = variável `APP_SENHA` definida no painel do Render |
+| Acesso ao sistema | Usuário = variável `APP_USUARIO`, senha = variável `APP_SENHA`, ambas no painel do Render |
 
 O repositório `cirqueiraofc-dev/threejs-skills` tem uma branch `claude/contract-rt-management-system-0d292l`
 com uma **cópia obsoleta** deste código — foi onde o projeto nasceu antes de ganhar repositório
@@ -106,6 +106,7 @@ PDFs gerados**. Mais os testes de senha e da rota de saúde.
 | Variável | Para que serve |
 | --- | --- |
 | `APP_SENHA` | Senha de acesso. **Sempre defina** ao publicar na internet. Sem ela o sistema roda aberto |
+| `APP_USUARIO` | Nome exigido no campo Usuário. Em branco, qualquer nome serve e só a senha vale |
 | `PORT` | Porta (padrão 3000). No Render é definida automaticamente |
 | `DATA_DIR` | Pasta do banco (padrão `./data`) |
 | `UPLOAD_DIR` | Pasta dos PDFs (padrão `./uploads`) |
@@ -204,16 +205,20 @@ Contratos têm redações muito diferentes. Nada é gravado direto: todo PDF lid
 revisão com os campos preenchidos e as evidências da detecção. É proposital — o enquadramento da
 modalidade é responsabilidade do RT, o sistema apenas sugere e mostra por quê.
 
-### 6.5 No login, o usuário é ignorado
+### 6.5 O login confere usuário e senha
 
-Só a senha vale. Quem acessa pode digitar qualquer coisa no campo de usuário. Foi corrigido um bug
+Foi corrigido um bug
 em que senha contendo `:` nunca funcionaria (o cabeçalho Basic é `usuario:senha`, e o código
 quebrava em todos os `:`). A comparação é feita em tempo constante.
 
 A porta de entrada é `public/login.html`, e ela é de verdade: o formulário posta em `/entrar`, que
-confere a senha e devolve um cookie assinado (`src/sessao.js`). Não há banco de sessões - o cookie
-carrega a própria validade e um HMAC dela feito com a senha, então trocar a `APP_SENHA` derruba
-todas as sessões emitidas antes.
+confere o par e devolve um cookie assinado (`src/sessao.js`). Não há banco de sessões - o cookie
+carrega a própria validade e um HMAC dela feito com `APP_USUARIO` + `APP_SENHA` juntos, então
+trocar qualquer um dos dois derruba todas as sessões emitidas antes.
+
+O usuário é conferido de forma tolerante - ignora maiúscula e espaço sobrando - porque é um nome,
+não um segredo. A senha continua em comparação de tempo constante. Quando `APP_USUARIO` está em
+branco o sistema se comporta como sempre se comportou: qualquer nome entra e só a senha decide.
 
 O Basic continua aceito, para chamar a API de fora do navegador sem inventar um segundo segredo.
 A tela de entrada e o que ela carrega (`/css/`, `/imagens/`, `/fontes/`) respondem antes da

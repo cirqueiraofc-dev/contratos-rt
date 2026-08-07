@@ -1,16 +1,18 @@
 /**
  * Sessao por cookie assinado.
  *
- * A protecao por senha continua sendo a mesma senha unica do APP_SENHA — o
- * que muda e a porta de entrada. Antes o navegador pedia a senha na caixinha
+ * A protecao continua sendo o par unico de APP_USUARIO e APP_SENHA — o que
+ * muda e a porta de entrada. Antes o navegador pedia a senha na caixinha
  * dele, que nao tem como ser explicada nem tem jeito de sair. Agora quem pede
  * e a tela de entrada do sistema, e o que fica guardado no navegador e este
  * cookie.
  *
  * Nao ha banco de sessoes: o cookie carrega a propria validade e uma
- * assinatura HMAC feita com a senha. Se a senha mudar, toda sessao emitida
- * antes para de valer sozinha — que e exatamente o que se espera de uma troca
- * de senha.
+ * assinatura HMAC feita com esse par. Se o usuario ou a senha mudarem, toda
+ * sessao emitida antes para de valer sozinha — que e exatamente o que se
+ * espera de uma troca de senha.
+ *
+ * O `segredo` que estas funcoes recebem e o par ja juntado por quem chamou.
  */
 import crypto from 'node:crypto';
 
@@ -19,8 +21,8 @@ export const NOME_COOKIE = 'sessao';
 /** 30 dias. Longo de proposito: e uma ferramenta de trabalho de uso diario. */
 export const DURACAO = 30 * 24 * 60 * 60 * 1000;
 
-function assinar(senha, ate) {
-  return crypto.createHmac('sha256', String(senha)).update(String(ate)).digest('base64url');
+function assinar(segredo, ate) {
+  return crypto.createHmac('sha256', String(segredo)).update(String(ate)).digest('base64url');
 }
 
 /** Comparacao de tempo constante, para nao vazar a assinatura pelo relogio. */
@@ -52,19 +54,19 @@ export function lerCookies(cabecalho) {
 }
 
 /** O valor do cookie: validade e assinatura dela, separadas por ponto. */
-export function emitir(senha, agora = Date.now()) {
+export function emitir(segredo, agora = Date.now()) {
   const ate = agora + DURACAO;
-  return `${ate}.${assinar(senha, ate)}`;
+  return `${ate}.${assinar(segredo, ate)}`;
 }
 
 /** Verdadeiro so se a assinatura confere E a validade ainda nao passou. */
-export function valido(valor, senha, agora = Date.now()) {
+export function valido(valor, segredo, agora = Date.now()) {
   const corte = String(valor ?? '').indexOf('.');
   if (corte === -1) return false;
   const ate = String(valor).slice(0, corte);
   const marca = String(valor).slice(corte + 1);
   if (!/^\d+$/.test(ate)) return false;
-  if (!iguais(marca, assinar(senha, ate))) return false;
+  if (!iguais(marca, assinar(segredo, ate))) return false;
   return Number(ate) > agora;
 }
 
@@ -73,9 +75,9 @@ export function valido(valor, senha, agora = Date.now()) {
  * em https; em http local ele precisa ir sem essa marca, senao o navegador
  * descarta e ninguem consegue entrar durante o desenvolvimento.
  */
-export function cookieDeEntrada(senha, { seguro }) {
+export function cookieDeEntrada(segredo, { seguro }) {
   const partes = [
-    `${NOME_COOKIE}=${emitir(senha)}`,
+    `${NOME_COOKIE}=${emitir(segredo)}`,
     'Path=/',
     'HttpOnly',
     'SameSite=Lax',

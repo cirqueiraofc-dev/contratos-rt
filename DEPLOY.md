@@ -82,6 +82,7 @@ não tem backup automático no plano starter.
 | Variável     | Para que serve                                                        |
 | ------------ | --------------------------------------------------------------------- |
 | `APP_SENHA`  | Senha de acesso. **Sempre defina** quando publicar na internet.         |
+| `APP_USUARIO`| Nome de usuário exigido no login. Em branco = qualquer nome serve.      |
 | `DATA_DIR`   | Pasta do banco. No Render, dentro do disco montado.                    |
 | `UPLOAD_DIR` | Pasta dos PDFs. No Render, dentro do disco montado.                    |
 | `PORT`       | Porta. O Render define sozinho, não mexa.                              |
