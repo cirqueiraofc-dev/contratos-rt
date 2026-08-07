@@ -25,14 +25,18 @@
    tela fala. Tratada para virar clima e nao assunto: desfocada, meio
    dessaturada e coberta pelo indigo da marca. Foto nitida atras de um campo de
    senha atrapalha quem digita; assim ela ambienta sem disputar atencao.
+   O arquivo e o original em 3840x2880, para nao borrar por falta de pixel em
+   monitor grande — o desfoque abaixo e escolha, nao limitacao. Justamente por
+   isso o desfoque pode ser menor: com a foto nitida na origem, os feixes de luz
+   saem lisos em vez de escadinha.
    Fonte: Unsplash, licenca livre para uso comercial (foto de Elijah Ekdahl).
-   O tratamento e todo em CSS — o arquivo guardado e a foto original. */
+   O tratamento e todo em CSS — o arquivo guardado continua sendo o original. */
 .tela-entrada::before {
   content: '';
   position: absolute; inset: -20px; z-index: -2;
   background: url('/imagens/fundo-entrada.jpg') center / cover no-repeat;
-  filter: blur(7px) grayscale(.55);
-  opacity: .42;
+  filter: blur(5px) grayscale(.5);
+  opacity: .46;
   pointer-events: none;
 }
 
