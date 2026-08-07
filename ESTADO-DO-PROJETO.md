@@ -367,10 +367,15 @@ cadastrado como responsável técnico** porque o documento não diz que ele é.
    principalmente **quais RTs marcou**) e ajustar `src/extract/contrato.js` e `src/disciplinas.js`.
 4. **Cadastrar os responsáveis técnicos** da ECOART em Configurações (nome, título, CREA, RNP e as
    modalidades que cada um assina).
-5. **Migrar para o plano pago antes do primeiro contrato real.** No gratuito, um reinício apaga
-   banco e PDFs sem aviso. Passo a passo no `DEPLOY.md`. Até lá, **baixar a cópia de segurança em
-   Configurações depois de cada cadastro** — é o que existe hoje entre a cliente e a perda dos
-   dados, e depende de alguém lembrar.
+5. ~~Migrar para o plano pago antes do primeiro contrato real~~ — **resolvido em 07/08/2026** sem
+   custo: o cofre (`src/cofre.js` + `src/r2.js`) foi configurado com um bucket no Cloudflare R2
+   (as quatro variáveis `R2_CONTA`, `R2_BALDE`, `R2_CHAVE_ID`, `R2_CHAVE_SECRETA` estão no Render).
+   Testado com reinício manual do serviço: os dados sobreviveram. O plano gratuito do Render
+   continua apagando o disco a cada deploy/reinício, mas o banco agora volta sozinho a partir do
+   R2 antes de o sistema abrir — ver seção 6.7. Continua valendo **baixar a cópia de segurança em
+   Configurações de vez em quando**: cobre o caso raro de falha na conta do Cloudflare, que o
+   cofre sozinho não cobre. As limitações que sobram são as de CPU e hibernação do plano
+   gratuito (ver `DEPLOY.md`), não mais perda de dado.
 6. **Fechar o repositório** (tornar privado) quando o sistema estiver pronto.
 
 ### Identidade visual — feita
@@ -447,15 +452,18 @@ evento, não.
 
 ## 11. Histórico de commits
 
-```
-4bb89a4  Fix password check for passwords containing a colon
-0535179  Make the free tier the default deploy configuration
-467c398  Add a free-tier blueprint variant
-21a28b1  Use the Render region closest to Brazil
-5938c1b  Add deploy configuration and health check
-e5aed42  Add contract amendments (termos aditivos)
-580799f  Add contract and RT management system
-```
+Lista completa fica desatualizada rápido demais para manter aqui — ver `git log --oneline` no
+repositório (53 commits até 07/08/2026). Por época, o que cada leva de commits trouxe:
+
+| Época | O que entrou |
+| --- | --- |
+| `580799f` → `4bb89a4` | Escopo original: cadastro por PDF, detecção de RT, ARTs, termos aditivos, deploy no Render, correção do login com senha contendo `:` |
+| `77c97b7` → `2ed34cc` | Documento de passagem (este arquivo), identidade visual ECOART, correção de contraste no modo escuro |
+| `9a57368` → `671367d` | Animações de tela, tela de login com a marca em partículas, ajustes de tamanho/responsividade |
+| `cf70875` → `4124762` | Cofre no R2 (banco sobrevive a reinício do plano gratuito), backup/restauração em `.zip`, tipografia própria (Inter/Nunito) |
+| `1b6ecbc` → `d21fb4c` | PDFs também passam a viver no R2, logo da ECOART traçada em vetor para a marca da barra lateral e da tela de entrada |
+| `59f3a68` → `191bae4` | Tela de entrada com a arte da ECOART em tela cheia, geometria do cartão sobre a arte |
+| `eb40ee9` → `7bef4e9` | Suporte a mais de uma empresa (`empresa_id`, migração da trava `CHECK (id=1)`, página própria de empresas), log do R2 diz qual variável falta |
 
 ---
 
