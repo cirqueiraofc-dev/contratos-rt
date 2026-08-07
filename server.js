@@ -60,5 +60,13 @@ app.listen(PORTA, () => {
     'cofre-vazio': 'cofre no R2 ainda sem cópia; a primeira gravação cria',
     desligado: 'sem R2 configurado — os dados vivem só no disco desta máquina',
   }[situacao];
-  console.log(`  Arquivos em ${r2.configurado() ? 'Cloudflare R2' : 'disco local'} · ${explicacao}\n`);
+  console.log(`  Arquivos em ${r2.configurado() ? 'Cloudflare R2' : 'disco local'} · ${explicacao}`);
+
+  // Sem isto, "sem R2 configurado" e um beco sem saida: as quatro variaveis
+  // aparecem preenchidas no painel e mesmo assim o sistema nao as ve, e nao ha
+  // o que olhar que diga qual delas. Diz os NOMES que faltam, nunca os valores.
+  if (!r2.configurado()) {
+    console.log(`  Faltando: ${r2.faltando().join(', ')}`);
+  }
+  console.log('');
 });

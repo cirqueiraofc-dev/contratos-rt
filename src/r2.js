@@ -20,19 +20,35 @@ import crypto from 'node:crypto';
 const REGIAO = 'auto';        // o R2 nao tem regiao; "auto" e o valor que ele espera
 const SERVICO = 's3';
 
+export const VARIAVEIS = ['R2_CONTA', 'R2_BALDE', 'R2_CHAVE_ID', 'R2_CHAVE_SECRETA'];
+
+/**
+ * O valor da variavel, sem espaco nas pontas.
+ *
+ * Colar uma chave num painel de hospedagem costuma trazer um espaco ou uma
+ * quebra de linha junto. Um espaco sobrando na assinatura SigV4 nao da erro
+ * de configuracao: da erro de credencial invalida, la na frente, quando ja
+ * ninguem lembra de onde veio.
+ */
+function variavel(nome) {
+  return (process.env[nome] ?? '').trim();
+}
+
+/** Quais das quatro faltam. Nomes, nunca valores — isto vai para o log. */
+export function faltando() {
+  return VARIAVEIS.filter((nome) => !variavel(nome));
+}
+
 export function configurado() {
-  return Boolean(
-    process.env.R2_CONTA && process.env.R2_BALDE
-    && process.env.R2_CHAVE_ID && process.env.R2_CHAVE_SECRETA,
-  );
+  return faltando().length === 0;
 }
 
 function ajustes() {
   return {
-    conta: process.env.R2_CONTA,
-    balde: process.env.R2_BALDE,
-    chaveId: process.env.R2_CHAVE_ID,
-    segredo: process.env.R2_CHAVE_SECRETA,
+    conta: variavel('R2_CONTA'),
+    balde: variavel('R2_BALDE'),
+    chaveId: variavel('R2_CHAVE_ID'),
+    segredo: variavel('R2_CHAVE_SECRETA'),
   };
 }
 
