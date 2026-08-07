@@ -40,8 +40,8 @@
   display: flex; justify-content: center; align-items: center;
   margin-bottom: 26px;
 }
-.entrada-marca .marca-logo { font-size: 116px; }
-.entrada-marca .marca-logo .solucoes { font-size: 36px; margin-top: 14px; }
+/* a logo e vetor: ocupa a largura do bloco e a altura sai da proporcao dela */
+.entrada-marca .marca-logo { width: 100%; }
 
 .entrada-titulo { text-align: center; margin-bottom: 26px; }
 .entrada-titulo h1 { font-size: 19px; font-weight: 650; }
@@ -119,12 +119,10 @@
 }
 
 @media (max-width: 720px) {
-  .entrada-marca .marca-logo { font-size: 74px; }
-  .entrada-marca .marca-logo .solucoes { font-size: 23px; margin-top: 9px; }
+
   .entrada-marca[data-marca-particulas] { height: 180px; }
 }
 @media (max-width: 460px) {
-  .entrada-marca .marca-logo { font-size: 52px; }
-  .entrada-marca .marca-logo .solucoes { font-size: 16px; margin-top: 7px; }
+
   .entrada-marca[data-marca-particulas] { height: 132px; }
 }

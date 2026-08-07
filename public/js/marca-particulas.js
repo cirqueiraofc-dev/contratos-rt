@@ -40,9 +40,11 @@ function lerCor(raiz, seletor, padrao) {
 
 /** Desenha a marca num canvas fora da tela e devolve o campo de particulas. */
 function amostrar(marca, largura, altura, dpr) {
-  const fonte = getComputedStyle(marca);
-  const familia = fonte.fontFamily;
-  const tamanho = parseFloat(fonte.fontSize);
+  // A marca e a logo de verdade da ECOART, em vetor. Antes isto redesenhava
+  // "eco"+"art"+"SOLUÇÕES" com fonte parecida; agora copia o desenho oficial,
+  // entao as particulas formam a logo da empresa e nao uma imitacao dela.
+  const logo = marca.tagName === 'IMG' ? marca : marca.querySelector('img');
+  if (!logo || !logo.complete || !logo.naturalWidth) return null;
 
   const molde = document.createElement('canvas');
   molde.width = Math.max(1, Math.floor(largura * dpr));
@@ -51,35 +53,24 @@ function amostrar(marca, largura, altura, dpr) {
   if (!ctx) return null;
   ctx.scale(dpr, dpr);
 
-  // ---- linha de cima: "eco" + "art", encostados, como na logo
-  ctx.textBaseline = 'alphabetic';
-  ctx.font = `700 ${tamanho}px ${familia}`;
-  const larguraEco = ctx.measureText('eco').width;
-  const larguraArt = ctx.measureText('art').width;
-  const x0 = (largura - (larguraEco + larguraArt)) / 2;
-  const yTopo = altura * 0.52;
-
-  ctx.fillStyle = lerCor(marca, '.eco', '#e5762d');
-  ctx.fillText('eco', x0, yTopo);
-  ctx.fillStyle = lerCor(marca, '.art', '#40316a');
-  ctx.fillText('art', x0 + larguraEco, yTopo);
-
-  // ---- linha de baixo: "SOLUÇÕES", espacado como no CSS
-  const tamanhoSol = Math.max(8, tamanho * 0.26);
-  const espaco = tamanhoSol * 0.44;
-  ctx.font = `600 ${tamanhoSol}px ${familia}`;
-  ctx.fillStyle = lerCor(marca, '.solucoes', '#a6a6a6');
-  const palavra = 'SOLUÇÕES';
-  let larguraSol = -espaco;
-  for (const ch of palavra) larguraSol += ctx.measureText(ch).width + espaco;
-  let x = (largura - larguraSol) / 2;
-  const ySol = yTopo + tamanhoSol * 1.75;
-  for (const ch of palavra) {
-    ctx.fillText(ch, x, ySol);
-    x += ctx.measureText(ch).width + espaco;
-  }
+  // encaixa a logo na area sem deformar, deixando uma folga nas bordas para as
+  // particulas terem para onde ser empurradas
+  const folga = 0.92;
+  const escala = Math.min(
+    (largura * folga) / logo.naturalWidth,
+    (altura * folga) / logo.naturalHeight,
+  );
+  const w = logo.naturalWidth * escala;
+  const h = logo.naturalHeight * escala;
+  ctx.drawImage(logo, (largura - w) / 2, (altura - h) / 2, w, h);
 
   // ---- transforma os pixels acesos em particulas
+  // Densidade, tamanho do ponto e raio do mouse eram calibrados pelo corpo da
+  // fonte. A altura da logo inteira e cerca do dobro disso (a fonte media a
+  // altura das letras, nao o bloco com o SOLUÇÕES embaixo), entao a referencia
+  // e a altura desenhada reduzida na mesma proporcao — assim a calibragem
+  // antiga continua valendo.
+  const tamanho = h * 0.45;
   const passo = passoPara(tamanho);
   const img = ctx.getImageData(0, 0, molde.width, molde.height);
   const dados = img.data;

@@ -208,12 +208,11 @@ p { margin: 0 0 .6em; }
    lateral, entao ela se ajusta sozinha quando a barra muda de largura (260px,
    292px na tela grande, largura cheia no celular) sem precisar de um tamanho
    para cada caso. O clamp evita que fique minuscula ou absurda nos extremos. */
-.marca-logo {
-  font-family: var(--fonte-marca);
-  font-size: clamp(30px, 35.5cqw, 96px);
-  font-weight: 700; line-height: 1; letter-spacing: -.02em;
-  display: block;
-}
+.marca-logo { display: block; }
+/* Vetor, nao imagem: nitida em qualquer tamanho e em tela retina, e o arquivo
+   inteiro tem 8 KB. Ocupa a largura util da lateral; a altura sai da propria
+   proporcao da logo. */
+.marca-logo img { display: block; width: 100%; height: auto; }
 .marca-logo .eco { color: var(--marca-laranja); }
 .marca-logo .art { color: var(--marca-indigo); }
 /* Em `em`, para crescer junto com a marca.
