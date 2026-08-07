@@ -49,6 +49,13 @@ test('a rota de saúde responde sem senha e não devolve dado nenhum', async () 
   assert.deepEqual(await resposta.json(), { ok: true });
 });
 
+test('os cabeçalhos de segurança vão em qualquer resposta', async () => {
+  const resposta = await fetch(`${url}/saude`);
+  assert.equal(resposta.headers.get('x-frame-options'), 'DENY');
+  assert.equal(resposta.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(resposta.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
+});
+
 test('sem senha, a API não abre', async () => {
   for (const caminho of ['/api/painel', '/api/contratos']) {
     const resposta = await fetch(url + caminho);
@@ -224,4 +231,19 @@ test('sessão emitida com um usuário não vale para outro', async () => {
   } finally {
     await new Promise((r) => outro.close(r));
   }
+});
+
+test('depois de errar demais, o freio barra até a senha certa', async () => {
+  // um login certo no teste anterior já zerou a contagem deste IP; erra seis
+  // vezes seguidas para garantir que o freio dispara não importa de onde partiu
+  for (let i = 0; i < 6; i += 1) {
+    const { resposta, cookie } = await entrar('senha-errada');
+    assert.equal(resposta.headers.get('location'), '/login.html?erro=1');
+    assert.equal(cookie, '');
+  }
+
+  // agora a senha certa também é recusada — o freio nem chega a conferi-la
+  const { resposta, cookie } = await entrar(SENHA);
+  assert.equal(resposta.headers.get('location'), '/login.html?erro=1');
+  assert.equal(cookie, '', 'a senha certa não deveria entrar durante o bloqueio');
 });

@@ -46,6 +46,47 @@ function usuarioConfere(informado, esperado) {
 }
 
 /**
+ * Freio contra tentativa de adivinhar a senha por forca bruta.
+ *
+ * Nao ha conta para bloquear — e uma senha so, compartilhada — entao o freio
+ * e por IP de quem tenta. A partir do quinto erro seguido sem um acerto no
+ * meio, o IP espera um tempo que dobra a cada novo erro (30s, 1min, 2min...
+ * ate um teto de 15min). Um login certo zera a contagem desse IP.
+ *
+ * Nao e infalivel — X-Forwarded-For pode ser forjado fora de um proxy
+ * confiavel — mas encarece uma tentativa automatizada sem exigir cadastro
+ * nem CAPTCHA, e sem guardar nada em disco.
+ */
+const tentativasPorIp = new Map();
+const TETO_ESPERA_MS = 15 * 60 * 1000;
+
+function segundosBloqueado(ip) {
+  const registro = tentativasPorIp.get(ip);
+  if (!registro || registro.bloqueadoAte <= Date.now()) return 0;
+  return Math.ceil((registro.bloqueadoAte - Date.now()) / 1000);
+}
+
+function registrarFalhaDeLogin(ip) {
+  const registro = tentativasPorIp.get(ip) ?? { erros: 0, bloqueadoAte: 0 };
+  registro.erros += 1;
+  if (registro.erros >= 5) {
+    const espera = Math.min(30_000 * 2 ** (registro.erros - 5), TETO_ESPERA_MS);
+    registro.bloqueadoAte = Date.now() + espera;
+  }
+  tentativasPorIp.set(ip, registro);
+}
+
+// Varre de vez em quando para o mapa nao crescer para sempre com IP que so
+// tentou uma vez. Fica fora da funcao para nao recriar o timer a cada teste
+// que sobe uma aplicacao nova.
+setInterval(() => {
+  const agora = Date.now();
+  for (const [ip, r] of tentativasPorIp) {
+    if (r.bloqueadoAte < agora && r.erros < 5) tentativasPorIp.delete(ip);
+  }
+}, 30 * 60 * 1000).unref();
+
+/**
  * Monta a aplicacao Express. Separado de server.js para que os testes possam
  * subir a mesma aplicacao numa porta efemera.
  */
@@ -56,6 +97,18 @@ export function criarAplicacao({ senha = '', usuario = '' } = {}) {
   const segredo = `${usuario}\n${senha}`;
   const app = express();
   app.disable('x-powered-by');
+
+  // Cabecalhos de resposta que nao mudam comportamento nenhum da aplicacao,
+  // so fecham brecha de navegador: nao deixar o site ser carregado dentro de
+  // um <iframe> de outro site (clickjacking), nao deixar o navegador "adivinhar"
+  // um tipo de arquivo diferente do Content-Type declarado, e nao vazar a URL
+  // completa de dentro do sistema para o site de onde veio um link de saida.
+  app.use((_req, res, next) => {
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    next();
+  });
 
   // Verificacao de saude para o servico de hospedagem — fica antes da protecao
   // por senha, senao a plataforma recebe 401 e considera a aplicacao no ar como
@@ -80,12 +133,19 @@ export function criarAplicacao({ senha = '', usuario = '' } = {}) {
     const ABERTO = /^\/(entrar|sair|login(\.html)?|css\/|imagens\/|fontes\/)/;
 
     app.post('/entrar', express.urlencoded({ extended: false, limit: '4kb' }), (req, res) => {
+      // bloqueado nao chega nem a conferir a senha — e o proprio ponto do freio
+      if (segundosBloqueado(req.ip)) return res.redirect(303, '/login.html?erro=1');
+
       // as duas conferencias antes do `if`: assim errar o usuario e errar a
       // senha custam o mesmo tempo, e o relogio nao conta qual dos dois foi
       const nomeOk = usuarioConfere(req.body?.usuario, usuario);
       const senhaOk = senhaConfere(req.body?.senha ?? '', senha);
-      if (!nomeOk || !senhaOk) return res.redirect(303, '/login.html?erro=1');
+      if (!nomeOk || !senhaOk) {
+        registrarFalhaDeLogin(req.ip);
+        return res.redirect(303, '/login.html?erro=1');
+      }
 
+      tentativasPorIp.delete(req.ip);
       res.setHeader('Set-Cookie', cookieDeEntrada(segredo, { seguro: seguro(req) }));
       return res.redirect(303, '/');
     });
