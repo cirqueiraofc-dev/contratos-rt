@@ -1,97 +1,95 @@
 /* Tela de entrada.
-   Herda cores e controles do app.css — aqui fica so o que esta tela tem de
-   proprio. A arte de fundo e da ECOART: montagem de estrutura, com a marca na
-   roupa de quem trabalha. Ela vem como uma imagem so, sem a marca nem o cartao
-   desenhados dentro, porque esses dois sao elementos de verdade por cima e
-   precisam acompanhar qualquer tamanho de tela. */
+   A arte da ECOART e o fundo inteiro. Ela nao e enfeite: o cartao precisa
+   cair no vazio claro que a arte deixa a esquerda, logo abaixo da marca —
+   e a marca que aparece e a da propria arte, nao uma copia por cima. */
 
+/* A arte e clara em toda a area util, entao esta tela ignora o tema escuro
+   do sistema: um cartao preto sobre foto ensolarada nao fecha. As variaveis
+   ficam presas nos valores claros so aqui dentro. */
 .tela-entrada {
-  min-height: 100vh;
+  --superficie: #ffffff;
+  --superficie-2: #faf9fc;
+  --borda: #e7e4ee;
+  --borda-forte: #d8d3e2;
+  --texto: #1d1826;
+  --texto-fraco: #6b6577;
+  --acento: #40316a;
+  --acento-suave: #eeebf5;
+  --sobre-cor: #ffffff;
+  --critico: #c33b3b;
+  --critico-suave: #fdecec;
+
   min-height: 100dvh;
-  display: grid;
-  place-items: center;
-  padding: 32px 24px;
-  /* o indigo e o piso: enquanto a foto nao chega, e se ela nunca chegar, a
-     tela ja esta escura e tudo por cima continua legivel */
-  background: #2c244a url('/imagens/fundo-entrada.jpg') center / cover no-repeat;
+  background: var(--fundo);
 }
 
+/* ---------------------------------------------------------------- palco */
+
+/* Quem PINTA a arte e o palco, com `cover` ancorado a esquerda: o corte come
+   pela direita, onde e so foto, e nunca pela esquerda, onde estao a marca e
+   o vazio. Assim nunca sobra tira de fundo, seja qual for a janela. */
+.palco {
+  position: fixed; inset: 0; overflow: hidden;
+  background: url('/imagens/entrada-capa.webp') left center / cover no-repeat;
+}
+
+/* Esta caixa nao pinta nada. Ela reproduz, em geometria, o retangulo que o
+   `cover` acima desenhou — e o sistema de coordenadas da arte. E por ele que
+   o cartao sabe onde fica o vazio embaixo da marca, em vez de depender de
+   um palpite de margem que quebra a cada tamanho de tela. */
+.palco-arte {
+  position: absolute; left: 0; top: 50%;
+  transform: translateY(-50%);
+  width: max(100vw, calc(100dvh * 1672 / 941));
+  aspect-ratio: 1672 / 941;
+}
+
+/* -------------------------------------------------------------- entrada */
+
+/* 20,6% e o meio da marca dentro da arte; 30% fica logo abaixo dela (a marca
+   termina em 25,1% da altura). Ancorar pelo topo, e nao pelo centro, e o que
+   impede o cartao de subir por cima da marca em janela baixa e larga. */
 .entrada {
-  width: 100%;
-  /* largo por causa da marca; o cartao continua estreito, centralizado nela */
-  max-width: 780px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 34px;
+  position: absolute; left: 20.6%; top: 30%;
+  transform: translateX(-50%);
+  width: min(430px, 78vw);
 }
 
-/* A marca domina a tela: e a porta da empresa, e o cartao e so o formulario.
-   Larga o quanto a tela deixar, com teto para nao ficar absurda em monitor
-   ultralargo. */
-.entrada-marca {
-  display: block;
-  width: min(720px, 88vw);
-  height: auto;
-}
+.entrada-marca { display: none; }
 
 .entrada-cartao {
-  width: 100%;
-  max-width: 460px;
-  background: #fff;
-  border-radius: 16px;
-  box-shadow: 0 24px 60px rgba(20, 14, 40, .32);
-  padding: 34px 32px;
+  background: var(--superficie);
+  border: 1px solid color-mix(in srgb, var(--borda) 70%, transparent);
+  border-radius: 18px;
+  box-shadow: 0 2px 4px rgba(24, 20, 44, .05),
+              0 18px 46px -12px rgba(24, 20, 44, .28);
+  padding: 32px 30px 24px;
   animation: entrada-surgir 460ms cubic-bezier(.22, 1, .36, 1) both;
 }
 
-@keyframes entrada-surgir {
-  from { opacity: 0; transform: translateY(14px) scale(.985); }
-}
+@keyframes entrada-surgir { from { opacity: 0; transform: translateY(14px) scale(.985); } }
 
-/* ---------------------------------------------------------------- form */
+.entrada-titulo { text-align: center; margin-bottom: 24px; }
+.entrada-titulo h1 { font-size: 19px; font-weight: 650; }
+.entrada-titulo p { margin: 5px 0 0; font-size: 13px; color: var(--texto-fraco); }
 
-/* o cartao e branco sempre, mesmo com o sistema no tema escuro: ele e uma
-   folha por cima da arte, nao uma superficie do sistema */
-.entrada-form .campo { margin-bottom: 18px; }
-.entrada-form .campo label {
-  display: block; margin-bottom: 7px;
-  font-size: 13.5px; font-weight: 620; color: #3b3552;
-}
-.entrada-form .campo input {
-  width: 100%; box-sizing: border-box;
-  padding: 13px 14px; font: inherit; font-size: 15px;
-  color: #1d1826;
-  background: #fbfbfd;
-  border: 1px solid #ddd9e6;
-  border-radius: 9px;
-  transition: border-color var(--transicao), box-shadow var(--transicao);
-}
-.entrada-form .campo input:hover { border-color: #c6c0d6; }
-.entrada-form .campo input:focus {
-  outline: none;
-  border-color: var(--marca-indigo);
-  box-shadow: 0 0 0 3px rgba(64, 49, 106, .16);
-}
-
-.entrada-form .botao {
-  width: 100%; margin-top: 10px;
-  padding: 14px 16px; font-size: 15px; font-weight: 640;
-  background: #3a2f63; border-color: #3a2f63; color: #fff;
-  border-radius: 9px;
-}
-.entrada-form .botao:hover { background: #473a77; border-color: #473a77; }
+.entrada-form .campo { margin-bottom: 15px; }
+.entrada-form .campo input { padding: 11px 13px; font-size: 15px; }
+.entrada-form .botao { margin-top: 8px; padding: 12px 16px; font-size: 14.5px; }
 
 /* mensagem de erro devolvida pelo servidor */
 .entrada-erro {
   display: flex; align-items: flex-start; gap: 9px;
-  background: #fdecec; border: 1px solid #f3c2c2; border-left-width: 3px;
-  border-radius: 8px; padding: 11px 13px; margin-bottom: 18px;
-  color: #a32020; font-size: 13px; line-height: 1.45;
+  background: var(--critico-suave);
+  border: 1px solid color-mix(in srgb, var(--critico) 32%, transparent);
+  border-left-width: 3px; border-radius: var(--raio-p);
+  padding: 10px 13px; margin-bottom: 18px;
+  color: var(--critico); font-size: 13px; line-height: 1.45;
   animation: entrada-tremer 320ms cubic-bezier(.36, .07, .19, .97) both;
 }
 .entrada-erro::before { content: '!'; font-weight: 700; line-height: 1.45; }
 
+/* balanco curto e discreto: chama a atencao sem parecer alarme */
 @keyframes entrada-tremer {
   10%, 90% { transform: translateX(-1.5px); }
   20%, 80% { transform: translateX(3px); }
@@ -99,22 +97,38 @@
   40%, 60% { transform: translateX(5px); }
 }
 
-/* Lembrete discreto, fora do cartao. Some do desenho, mas nao do sistema: quem
-   entra aqui esta abrindo contrato que pertence a outra empresa, e vale estar
-   escrito. */
-.entrada-aviso {
-  margin: 0; text-align: center;
-  font-size: 12px; line-height: 1.5;
-  color: rgba(255, 255, 255, .55);
-  text-shadow: 0 1px 8px rgba(20, 14, 40, .6);
+/* O rodape fica DENTRO do cartao. Fora dele o texto cairia em cima da foto,
+   onde ora ha ceu claro, ora ha caixa de som preta — e nao ha cor de texto
+   que sirva para os dois. */
+.entrada-rodape {
+  margin: 20px 0 0; padding-top: 15px;
+  border-top: 1px solid var(--borda);
+  text-align: center; font-size: 11.5px; line-height: 1.55;
+  color: var(--texto-fraco);
 }
+.entrada-rodape strong { display: block; font-weight: 600; margin-bottom: 3px; }
 
 @media (prefers-reduced-motion: reduce) {
   .entrada-cartao, .entrada-erro { animation: none; }
 }
 
-@media (max-width: 520px) {
-  .tela-entrada { padding: 26px 18px; align-items: center; }
-  .entrada { gap: 26px; }
-  .entrada-cartao { padding: 28px 22px; border-radius: 14px; }
+/* ------------------------------------------------------- telas estreitas */
+
+/* Abaixo disto o vazio claro da arte ja nao cabe na tela e o cartao acabaria
+   por cima da foto. Entao a arte sai de cena e fica so a marca, sobre o
+   mesmo fundo claro do resto do sistema. */
+@media (max-width: 760px) {
+  .tela-entrada {
+    display: grid; place-items: center; padding: 26px 20px;
+    background:
+      radial-gradient(620px 380px at 12% 6%, rgba(245, 109, 29, .09), transparent 70%),
+      radial-gradient(560px 360px at 92% 94%, rgba(45, 26, 104, .08), transparent 70%),
+      #f2f3f6;
+  }
+  .palco { display: none; }
+  .entrada { position: static; transform: none; width: 100%; max-width: 400px; }
+  .entrada-marca {
+    display: block; width: min(280px, 76%);
+    height: auto; margin: 0 auto 26px;
+  }
 }

@@ -14,9 +14,9 @@
    que guia o visual: nada decora sem informar. Cor forte so aparece onde ha
    prazo correndo; o que esta em dia recua. */
 :root {
-  --marca-laranja: #e5762d;
+  --marca-laranja: #f56d1d;
   --marca-indigo: #40316a;
-  --marca-cinza: #a6a6a6;
+  --marca-cinza: #767476;
 
   --fundo: #f4f3f7;
   --superficie: #ffffff;
@@ -195,8 +195,6 @@ p { margin: 0 0 .6em; }
   position: sticky;
   top: 0;
   height: 100vh;
-  /* declara a lateral como contexto de medida para o `cqw` da marca */
-  container-type: inline-size;
 }
 
 /* Marca ECOART reproduzida em texto — a logo original nao tem simbolo, e so
@@ -204,28 +202,14 @@ p { margin: 0 0 .6em; }
    quando o sistema tiver uma; senao cai no padrao, que fica proximo. */
 .marca { display: flex; flex-direction: column; gap: 3px; }
 
-/* A marca ocupa a largura inteira da barra lateral. `cqw` mede a propria
-   lateral, entao ela se ajusta sozinha quando a barra muda de largura (260px,
-   292px na tela grande, largura cheia no celular) sem precisar de um tamanho
-   para cada caso. O clamp evita que fique minuscula ou absurda nos extremos. */
+/* Vetor tracado da arte oficial da ECOART — as tres pecas da marca (o "eco"
+   laranja, o "art" indigo e o "SOLUÇÕES" cinza) vem dentro do proprio SVG,
+   ja com o espacamento que a marca tem de verdade. Nada e remontado em
+   texto aqui: e a mesma marca que aparece na tela de entrada.
+   Ocupa a largura util da lateral e a altura sai da propria proporcao, entao
+   acompanha a barra quando ela muda de largura sem regra para cada caso. */
 .marca-logo { display: block; }
-/* Vetor, nao imagem: nitida em qualquer tamanho e em tela retina, e o arquivo
-   inteiro tem 8 KB. Ocupa a largura util da lateral; a altura sai da propria
-   proporcao da logo. */
 .marca-logo img { display: block; width: 100%; height: auto; }
-.marca-logo .eco { color: var(--marca-laranja); }
-.marca-logo .art { color: var(--marca-indigo); }
-/* Em `em`, para crescer junto com a marca.
-   O espacamento entre letras e o que decide o tamanho aqui: as duas linhas
-   tem a mesma largura, entao esticar mais as letras obriga a fonte a encolher.
-   Com .44em (o valor da logo original, pensado para uma marca pequena) o
-   SOLUCOES virava um fio de cabelo embaixo de uma marca de 88px. Menos
-   espacamento devolve corpo a palavra e mantem o ar de caixa-alta espacada. */
-.marca-logo .solucoes {
-  display: block; margin-top: .1em;
-  color: var(--marca-cinza); font-size: .18em; font-weight: 600;
-  letter-spacing: .19em; text-indent: .19em;
-}
 .marca-sistema {
   margin-top: 9px; padding-top: 9px; border-top: 1px solid var(--borda);
 }
