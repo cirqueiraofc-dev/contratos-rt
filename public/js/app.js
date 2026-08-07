@@ -201,7 +201,17 @@ async function carregarHistorico(id) {
   }
 }
 
-async function mostrarConfiguracoes(editandoId = empresaEmUso()) {
+/**
+ * @param editandoId qual empresa carregar no formulario; vazio abre em branco
+ * @param vindoDeClique leva ate o formulario e poe o cursor nele
+ *
+ * O segundo parametro existe porque sem ele os botoes pareciam quebrados: o
+ * formulario fica abaixo da lista, e trocar de empresa nao mexe em nada perto
+ * de onde a pessoa clicou. Com a lista de uma empresa so, em branco, "Adicionar"
+ * trocava um formulario vazio por outro formulario vazio — clique sem resposta
+ * nenhuma. Botao que nao responde e botao quebrado, mesmo funcionando.
+ */
+async function mostrarConfiguracoes(editandoId = empresaEmUso(), vindoDeClique = false) {
   const [lista, profissionais] = await Promise.all([api.empresas(), api.profissionais()]);
   empresas = lista;
   conteudo.innerHTML = telaConfiguracoes(empresas, editandoId, profissionais, disciplinas);
@@ -218,14 +228,16 @@ async function mostrarConfiguracoes(editandoId = empresaEmUso()) {
       // empresa recem-criada ja entra aberta: e o que quem cadastrou espera
       if (!id) escolherEmpresa(salvo.id);
       await recarregarEmpresas();
-      await mostrarConfiguracoes(salvo.id);
+      await mostrarConfiguracoes(salvo.id, true);
     } catch (erro) {
       aviso(erro.message, 'erro');
     }
   });
 
+  if (vindoDeClique) levarAoFormulario(formulario);
+
   for (const botao of $$('[data-editar-empresa]', conteudo)) {
-    botao.addEventListener('click', () => mostrarConfiguracoes(botao.dataset.editarEmpresa));
+    botao.addEventListener('click', () => mostrarConfiguracoes(botao.dataset.editarEmpresa, true));
   }
 
   for (const botao of $$('[data-remover-empresa]', conteudo)) {
@@ -315,6 +327,19 @@ async function mostrarConfiguracoes(editandoId = empresaEmUso()) {
       await mostrarConfiguracoes();
     });
   }
+}
+
+/** Rola ate o formulario, acende ele por um instante e poe o cursor no primeiro campo. */
+function levarAoFormulario(formulario) {
+  const cartao = formulario.closest('.cartao');
+  const semMovimento = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // 'nearest' rola so o necessario: com o formulario ja visivel a tela fica
+  // parada, e com ele abaixo da dobra sobe o tanto que falta e nada mais
+  cartao.scrollIntoView({ behavior: semMovimento ? 'auto' : 'smooth', block: 'nearest' });
+  // preventScroll para o foco nao brigar com a rolagem suave que acabou de comecar
+  $('[name="razao_social"]', formulario)?.focus({ preventScroll: true });
+  cartao.classList.add('acendendo');
+  setTimeout(() => cartao.classList.remove('acendendo'), 1400);
 }
 
 /* ------------------------------------------------------------- auxiliares */

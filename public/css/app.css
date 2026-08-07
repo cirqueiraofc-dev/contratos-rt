@@ -231,6 +231,19 @@ p { margin: 0 0 .6em; }
 #troca-empresa:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
 
 /* a empresa que esta aberta no formulario logo abaixo da tabela */
+/* Piscada curta no cartao que acabou de receber o conteudo, para o clique la
+   em cima ter resposta visivel aqui embaixo. */
+.cartao.acendendo {
+  animation: acender 1400ms cubic-bezier(.22, 1, .36, 1);
+}
+@keyframes acender {
+  0%   { box-shadow: 0 0 0 3px var(--acento); }
+  100% { box-shadow: 0 0 0 3px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cartao.acendendo { animation: none; outline: 2px solid var(--acento); }
+}
+
 .tabela .linha-ativa > td { background: var(--acento-suave); }
 .tabela .linha-ativa > td:first-child { box-shadow: inset 3px 0 0 var(--acento); }
 
